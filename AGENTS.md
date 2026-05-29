@@ -16,7 +16,7 @@ Key artifacts:
 
 **This repository mandates multi-agent as the development default.**
 
-- All significant implementation, refactor, test, and release tasks SHALL be executed using multi-agent delegation (pi-subagents, pi-messenger crew, or equivalent orchestration pattern).
+- All significant implementation, refactor, test, and release tasks SHALL be executed using multi-agent delegation (parallel agents in isolated git worktrees, coordinated by the orchestrating session).
 - No single-agent feature branches unless justified by unique coupling or strategic need; vertical slices and concurrency are the norm.
 - Keep this instruction at the top — future contributors and agents MUST follow multi-agent as the workflow baseline.
 
@@ -25,13 +25,13 @@ Key artifacts:
 ### Git Worktree is mandatory for parallel agent execution
 
 Every agent working in parallel on this repository **MUST** operate in its own isolated git worktree.
-This is the industry-established standard (adopted by Claude Code, OpenAI Codex, Cursor, pi-subagents).
+This is the industry-established standard (adopted by Claude Code, OpenAI Codex, Cursor, and other agent harnesses).
 
 **Why:**
 - Eliminates file-level conflicts between concurrent agents sharing the same repo.
 - Lightweight: shares the single `.git` object store — no disk bloat from full clones.
 - Clean merge history: each worktree lives on its own branch; integration is straightforward.
-- Natively supported by pi-subagents via `worktree: true`.
+- Universally supported: any agent that can run `git worktree add` can follow this standard.
 
 ### Worktree setup per agent/slice
 
@@ -51,18 +51,22 @@ git worktree list
 git worktree remove ../property-intelligence-<slice-name>
 ```
 
-### pi-subagents parallel config with worktree
+### Parallel agent dispatch — tool-agnostic pattern
 
-```json
-{
-  "tasks": [
-    { "agent": "worker", "task": "Implement ViaCepProvider" },
-    { "agent": "worker", "task": "Implement OverpassPoiProvider" },
-    { "agent": "worker", "task": "Implement AnaFloodRiskProvider" }
-  ],
-  "worktree": true
-}
+The orchestrating session creates one worktree per slice, then delegates:
+
+```sh
+# Orchestrator: create worktrees and hand off tasks
+git worktree add ../property-intelligence-viacep main    # → agent A
+git worktree add ../property-intelligence-overpass main  # → agent B
+git worktree add ../property-intelligence-ana main       # → agent C
+
+# Each agent works in its own directory; no shared mutable state
+# When done: gh pr create --fill --base main  (from within the worktree)
 ```
+
+> **Note for pi users:** the `pi-subagents` extension supports this via `worktree: true`
+> in the parallel task config. Any equivalent multi-agent tool works the same way.
 
 ### Known limitations & mitigations
 
