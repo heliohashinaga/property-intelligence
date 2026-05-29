@@ -1,21 +1,43 @@
 # Progress — Property Intelligence API
 
-## Phase 1: Setup
+## Phase 1: Setup ✅
 
 | Task | Status | Notes |
 |---|---|---|
 | T001 — Scaffold .NET 10 solution (9 projects) | ✅ Done | Committed + pushed |
 | T002 — NuGet packages + project references | ✅ Done | Committed + pushed |
 | T003 — docker-compose.yml + .env.example + migrations scaffold | ✅ Done | Committed + pushed |
-| T004 — GitHub Actions CI pipeline | ✅ Done (push blocked) | Committed locally; push requires `workflow` scope on GitHub PAT |
+| T004 — GitHub Actions CI pipeline | ✅ Done | Committed + pushed |
+
+## Phase 2: Foundational (in progress — branch `feat/phase-2`)
+
+| Task | Status | Notes |
+|---|---|---|
+| T005 — Interfaces (IDataProvider, IPropertyAnalysisEngine, IExplainabilityService, IAddressNormalizer, ICacheService) | ✅ Done | `Core/Interfaces/` |
+| T006 — Domain value types (PropertyAddress, DimensionScore, AnalysisWarning) | ✅ Done | `Core/Domain/` |
+| T007 — Entity types (PropertyAnalysis, ApiConsumer, DataProviderRawLog) | ✅ Done | `Core/Domain/` |
+| T008 — PropertyProfile aggregate + provider sub-records | ✅ Done | `Core/Domain/PropertyProfile.cs` |
+| T009 — PropertyIntelligenceDbContext | ✅ Done | `Core/Data/PropertyIntelligenceDbContext.cs` |
+| T010 — SQL migrations (001–005) | ✅ Done | `infra/migrations/001–005 .sql + run.sh` |
+| T011 — CacheService + CacheKeyHelper | ✅ Done | `Providers/Shared/` |
+| T012 — ApiKeyAuthMiddleware | ✅ Done | `Api/Middleware/ApiKeyAuthMiddleware.cs` |
+| T013 — GET /health endpoint | ✅ Done | `Api/Endpoints/HealthEndpoint.cs` |
+| T058 — Structured JSON logging middleware | ✅ Done | `Api/Program.cs` (JSON console + correlation ID) |
+| T074 — ANA shapefile import script | ✅ Done | `data/import/ana_shapefile_import.sh` |
+| T075 — IBGE CNEFE import script | ✅ Done | `data/import/ibge_cnefe_import.sh` |
+| T076 — INEP IDEB import script | ✅ Done | `data/import/inep_ideb_import.sh` |
+| T077 — CNES import script | ✅ Done | `data/import/cnes_import.sh` |
+| T014 — Run static dataset imports | ⏳ Blocked | Depends on T074–T077 + Docker up |
 
 ## Blocked
 
-**T004 push**: GitHub PAT missing `workflow` scope.
-- Fix: https://github.com/settings/tokens → add `workflow` scope to existing token
-- Then run: `git push` from `feat/phase-1-setup`
+**Docker Hub pull**: Docker daemon prefers IPv6 but only IPv4 has internet.
+- Fix (run once in terminal): `echo '52.23.22.209 registry-1.docker.io' | sudo tee -a /etc/hosts && echo '3.208.27.3 auth.docker.io' | sudo tee -a /etc/hosts && docker compose -f infra/docker-compose.yml up -d`
 
 ## Next
 
-- Unblock T004 push → create PR `feat/phase-1-setup` → merge to main
-- Start Phase 2: Foundational (T005–T014)
+- Fix Docker IPv4 issue (see Blocked above)
+- Run migrations: `sh infra/migrations/run.sh`
+- Verify `GET /health` returns `{"status":"healthy"}` — Phase 2 checkpoint
+- Mark T005–T013, T058, T074–T077 [x] in tasks.md
+- Start Phase 3: US1 (T015–T039)
