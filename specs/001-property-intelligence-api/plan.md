@@ -38,7 +38,7 @@ Hetzner CX31 (production) → OpenTofu (IaC) → Grafana Cloud via OpenTelemetry
 - `System.Net.Http.Json` — typed HTTP client for OpenRouter (OpenAI-compatible)
 - `NetTopologySuite` — geometry types for flood-zone point-in-polygon queries
 - `NetTopologySuite.IO.ShapeFile` — shapefile import (correct NuGet package)
-- `Aspire.Hosting` — .NET Aspire AppHost for local dev service orchestration
+- `Aspire.Hosting.PostgreSQL` + `Aspire.Hosting.Redis` — .NET Aspire AppHost packages (AppHost uses `Aspire.AppHost.Sdk`, not the bare `Aspire.Hosting` package)
 - `OpenTelemetry.Exporter.Otlp` + `OpenTelemetry.Instrumentation.AspNetCore` — metrics/traces → Grafana Cloud
 - `xUnit` + `Testcontainers` — integration tests with real DB/Redis containers
 - `WireMock.Net` — provider contract tests (mock external HTTP + OpenRouter)
@@ -48,9 +48,9 @@ Hetzner CX31 (production) → OpenTofu (IaC) → Grafana Cloud via OpenTelemetry
 - Redis 7 (provider result cache, TTL per provider)
 
 **Testing**: xUnit 2.x, Testcontainers.PostgreSql, Testcontainers.Redis,
-WireMock.Net, FluentAssertions
+WireMock.Net, Shouldly
 
-**Target Platform**: Linux; local dev via .NET Aspire + Docker Compose; production on K3s (K3s v1.30) single-node cluster on Hetzner CX31 (4 vCPU, 8GB RAM, Ubuntu 24.04); exposed via Cloudflare Tunnel (cloudflared)
+**Target Platform**: Linux; local dev via .NET Aspire (Postgres :5432, Redis :6379, dashboard :15000); production on K3s (K3s v1.30) single-node cluster on Hetzner CX31 (4 vCPU, 8GB RAM, Ubuntu 24.04); exposed via Cloudflare Tunnel (cloudflared)
 
 **Project Type**: Web service (REST API) + Vue.js frontend demo
 
@@ -198,8 +198,7 @@ frontend/
 └── vite.config.ts
 
 infra/
-├── docker-compose.yml             ← PostgreSQL+PostGIS, Redis, Cloudflared (dev)
-├── docker-compose.override.yml    ← local dev port overrides
+├── docker-compose.yml             ← Cloudflare tunnel only (profile `tunnel`; Postgres/Redis é Aspire)
 ├── migrations/
 │   ├── 001_initial_schema.sql
 │   ├── 002_crime_records.sql
