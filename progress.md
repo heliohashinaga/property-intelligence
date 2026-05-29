@@ -5,8 +5,8 @@
 | Task | Status | Notes |
 |---|---|---|
 | T001 — Scaffold .NET 10 solution (9 projects) | ✅ Done | Committed + pushed |
-| T002 — NuGet packages + project references | ✅ Done | Committed locally |
-| T003 — docker-compose.yml + .env.example + migrations scaffold | ✅ Done | Committed locally |
+| T002 — NuGet packages + project references | ✅ Done | Committed + pushed |
+| T003 — docker-compose.yml + .env.example + migrations scaffold | ✅ Done | Committed + pushed |
 | T004 — GitHub Actions CI pipeline | ✅ Done (push blocked) | Committed locally; push requires `workflow` scope on GitHub PAT |
 
 ## Blocked
