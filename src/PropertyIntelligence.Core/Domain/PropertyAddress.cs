@@ -6,6 +6,9 @@ namespace PropertyIntelligence.Core.Domain;
 /// </summary>
 public sealed record PropertyAddress
 {
+    /// <summary>Database primary key. Generated on first persist.</summary>
+    public Guid Id { get; init; } = Guid.NewGuid();
+
     /// <summary>Full normalized address string, e.g. "Rua Augusta, 1500 - Consolação, São Paulo - SP, 01304-001".</summary>
     public required string NormalizedAddress { get; init; }
 
@@ -27,4 +30,6 @@ public sealed record PropertyAddress
 
     /// <summary>WGS84 longitude. Populated after geocoding.</summary>
     public double? Lng { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 }
