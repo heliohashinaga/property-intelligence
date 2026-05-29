@@ -6,7 +6,11 @@
 
 ## Summary
 
-Loccali is a REST API that accepts a free-text Brazilian address and returns a
+This project adopts a definitive multi-agent implementation strategy: all major development, testing, and code review tasks are delegated to vertical slices via specialized agents (human and autonomous). Every slice (feature, provider, infra change, or contract) is implemented in parallel by isolated, coordinated agents using pi, crew, and subagent orchestration.
+
+**Git worktree is the mandatory isolation primitive** for all parallel agent execution. Each agent operates in its own worktree (separate working directory, own branch, shared `.git` store). This is aligned with the industry standard adopted by Claude Code, OpenAI Codex, Cursor, and pi-subagents natively.
+
+Property Intelligence is a REST API that accepts a free-text Brazilian address and returns a
 multidimensional property risk/opportunity score (0–1000) across 6 dimensions,
 with AI-generated natural language explanation in PT-BR. The system orchestrates
 8 heterogeneous data providers (public APIs + locally-imported datasets) in
@@ -108,7 +112,7 @@ specs/001-property-intelligence-api/
 
 ```text
 src/
-├── Loccali.Api/
+├── PropertyIntelligence.Api/
 │   ├── Endpoints/
 │   │   ├── AnalyzeEndpoint.cs
 │   │   └── HealthEndpoint.cs
@@ -117,7 +121,7 @@ src/
 │   ├── Program.cs
 │   └── appsettings.json
 │
-├── Loccali.Core/
+├── PropertyIntelligence.Core/
 │   ├── Domain/
 │   │   ├── PropertyAddress.cs
 │   │   ├── PropertyProfile.cs
@@ -134,7 +138,7 @@ src/
 │   └── Services/
 │       └── PropertyEnrichmentModule.cs
 │
-├── Loccali.Providers/
+├── PropertyIntelligence.Providers/
 │   ├── ViaCep/ViaCepProvider.cs
 │   ├── Overpass/OverpassPoiProvider.cs
 │   ├── Ana/AnaFloodRiskProvider.cs
@@ -145,7 +149,7 @@ src/
 │   ├── Iptu/IptuApiProvider.cs
 │   └── Shared/CacheService.cs
 │
-├── Loccali.Rules/
+├── PropertyIntelligence.Rules/
 │   ├── Facts/
 │   │   ├── PropertyFact.cs
 │   │   └── ScoringFact.cs
@@ -157,23 +161,23 @@ src/
 │       ├── AppreciationRules.cs
 │       └── UrbanContextRules.cs
 │
-└── Loccali.Explainability/
+└── PropertyIntelligence.Explainability/
     └── LlmExplainabilityService.cs      ← OpenRouter (OpenAI-compatible)
 
-src/Loccali.AppHost/                      ← .NET Aspire local dev orchestrator
+src/PropertyIntelligence.AppHost/                      ← .NET Aspire local dev orchestrator
     └── Program.cs                        ← wires Api + Providers + Rules projects
 
 tests/
-├── Loccali.Tests.Contract/
+├── PropertyIntelligence.Tests.Contract/
 │   ├── AnalyzeEndpointTests.cs    ← contract tests against real endpoint shape
 │   ├── ViaCepProviderTests.cs     ← WireMock.Net stubs per provider
 │   └── OverpassProviderTests.cs
 │
-├── Loccali.Tests.Integration/
+├── PropertyIntelligence.Tests.Integration/
 │   ├── PropertyAnalysisIntegrationTests.cs
 │   └── CrimeDataProviderIntegrationTests.cs
 │
-└── Loccali.Tests.Unit/
+└── PropertyIntelligence.Tests.Unit/
     ├── ScoringEngineTests.cs
     ├── AddressNormalizerTests.cs
     └── DimensionRulesTests.cs
@@ -189,7 +193,7 @@ frontend/
 │   ├── pages/
 │   │   └── Home.vue
 │   └── services/
-│       └── loccaliApi.ts
+│       └── propertyIntelligenceApi.ts
 ├── index.html
 └── vite.config.ts
 
@@ -208,12 +212,12 @@ infra/
 │   └── outputs.tf
 ├── k3s/                           ← K3s Kubernetes manifests (production)
 │   ├── namespace.yaml
-│   ├── loccali-api.yaml           ← Deployment + Service + HPA
+│   ├── property-intelligence-api.yaml           ← Deployment + Service + HPA
 │   ├── postgres.yaml              ← StatefulSet + PVC
 │   ├── redis.yaml
 │   └── cloudflared.yaml           ← DaemonSet → Cloudflare Tunnel
 └── grafana/
-    └── loccali-dashboard.json     ← Grafana Cloud dashboard (import JSON)
+    └── property-intelligence-dashboard.json     ← Grafana Cloud dashboard (import JSON)
 
 data/
 └── import/

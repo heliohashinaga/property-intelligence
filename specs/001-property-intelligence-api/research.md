@@ -150,7 +150,7 @@ updates (infrequent — typically annual).
 **Import command**:
 ```bash
 ogr2ogr -f "PostgreSQL" \
-  PG:"host=localhost dbname=loccali user=loccali" \
+  PG:"host=localhost dbname=property_intelligence user=property_intelligence" \
   areas_risco_enchente.shp \
   -nln flood_risk_zones \
   -t_srs EPSG:4326 \
@@ -324,8 +324,8 @@ var payload = new {
 };
 // POST openrouter.ai/api/v1/chat/completions
 // Authorization: Bearer {OPENROUTER_API_KEY}
-// HTTP-Referer: https://loccali.com.br  ← required by OpenRouter
-// X-Title: Loccali Property Intelligence
+// HTTP-Referer: https://property-intelligence.hashinaga.dev  ← required by OpenRouter
+// X-Title: Property Intelligence
 ```
 
 **PT-BR prompt** (same as before; model-agnostic):
@@ -349,7 +349,7 @@ do NOT fail the entire request.
 
 ## 15. .NET Aspire — Local Dev Orchestration
 
-**Decision**: Add `Loccali.AppHost` project (Aspire AppHost) that orchestrates
+**Decision**: Add `PropertyIntelligence.AppHost` project (Aspire AppHost) that orchestrates
 all .NET projects locally with service discovery, health dashboard, and
 OpenTelemetry built-in. Docker Compose remains for infrastructure services
 (PostgreSQL, Redis, Cloudflared).
@@ -359,13 +359,13 @@ provides a live dashboard (traces, metrics, logs) during development, and emits
 OpenTelemetry natively — same signals go to Grafana Cloud in production.
 
 ```csharp
-// src/Loccali.AppHost/Program.cs
+// src/PropertyIntelligence.AppHost/Program.cs
 var builder = DistributedApplication.CreateBuilder(args);
-var api = builder.AddProject<Projects.Loccali_Api>("api");
+var api = builder.AddProject<Projects.PropertyIntelligence_Api>("api");
 builder.Build().Run();
 ```
 
-**Developer workflow**: `dotnet run --project src/Loccali.AppHost` →
+**Developer workflow**: `dotnet run --project src/PropertyIntelligence.AppHost` →
 Aspire dashboard at `http://localhost:15000` (traces, logs, health per service).
 
 ---
@@ -384,8 +384,8 @@ Infrastructure provisioned with OpenTofu (`infra/tofu/`). K3s manifests in
 
 **K3s workload layout**:
 ```
-loccali namespace:
-  Deployment: loccali-api (2 replicas, rolling update)
+property-intelligence namespace:
+  Deployment: property-intelligence-api (2 replicas, rolling update)
   StatefulSet: postgres (1 replica, 20GB PVC)
   Deployment: redis (1 replica)
   DaemonSet: cloudflared (1 pod → Cloudflare Tunnel)
@@ -393,8 +393,8 @@ loccali namespace:
 
 **CI/CD deploy step** (GitHub Actions):
 ```bash
-kubectl set image deployment/loccali-api \
-  api=ghcr.io/heliomarpm/loccali-api:${GITHUB_SHA}
+kubectl set image deployment/property-intelligence-api \
+  api=ghcr.io/heliomarpm/property-intelligence-api:${GITHUB_SHA}
 ```
 
 **Hetzner vs alternatives**:
@@ -428,27 +428,27 @@ builder.Services.AddOpenTelemetry()
     .AddOtlpExporter());
 ```
 
-**Key Loccali metrics to instrument**:
-- `loccali.analysis.duration_ms` (histogram, by cached/uncached)
-- `loccali.provider.fetch_duration_ms` (histogram, by provider name)
-- `loccali.provider.cache_hit_total` (counter, by provider name)
-- `loccali.score.composite` (histogram, distribution of scores)
-- `loccali.insight.generation_ms` (histogram, OpenRouter latency)
+**Key Property Intelligence metrics to instrument**:
+- `property_intelligence.analysis.duration_ms` (histogram, by cached/uncached)
+- `property_intelligence.provider.fetch_duration_ms` (histogram, by provider name)
+- `property_intelligence.provider.cache_hit_total` (counter, by provider name)
+- `property_intelligence.score.composite` (histogram, distribution of scores)
+- `property_intelligence.insight.generation_ms` (histogram, OpenRouter latency)
 
-**Grafana dashboard** (`infra/grafana/loccali-dashboard.json`): panels for
+**Grafana dashboard** (`infra/grafana/property-intelligence-dashboard.json`): panels for
 request rate, p95 latency per endpoint, provider error rate, cache hit ratio,
 score distribution by grade.
 
 **Decision**: Three-layer testing:
 
-1. **Unit tests** (`Loccali.Tests.Unit`): Pure domain logic, NRules scoring
+1. **Unit tests** (`PropertyIntelligence.Tests.Unit`): Pure domain logic, NRules scoring
    rules, address normalizer. No I/O. Fast (<1s total).
 
-2. **Contract tests** (`Loccali.Tests.Contract`): Each provider tested against
+2. **Contract tests** (`PropertyIntelligence.Tests.Contract`): Each provider tested against
    WireMock.Net stubs. Verifies provider correctly parses known API responses.
    Written BEFORE implementation (TDD).
 
-3. **Integration tests** (`Loccali.Tests.Integration`): Real PostgreSQL +
+3. **Integration tests** (`PropertyIntelligence.Tests.Integration`): Real PostgreSQL +
    Redis via Testcontainers. Tests full analysis pipeline end-to-end with
    Overpass and Claude mocked via WireMock.Net.
 

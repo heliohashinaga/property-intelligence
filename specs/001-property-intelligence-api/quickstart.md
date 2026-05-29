@@ -20,15 +20,15 @@ Validated path from zero to a running analysis response.
 ## Step 1 — Clone & configure
 
 ```bash
-git clone https://github.com/heliomarpm/loccali.git
-cd loccali
+git clone https://github.com/heliohashinaga/property-intelligence.git
+cd property-intelligence
 cp .env.example .env
 ```
 
 Edit `.env`:
 
 ```env
-DATABASE_URL=postgres://loccali:loccali@localhost:5432/loccali
+DATABASE_URL=postgres://property_intelligence:property_intelligence@localhost:5432/property_intelligence
 REDIS_URL=redis://localhost:6379
 ANTHROPIC_API_KEY=sk-ant-...
 IPTU_API_KEY=...
@@ -46,7 +46,7 @@ docker compose up -d postgres redis
 
 Wait for PostgreSQL to be ready:
 ```bash
-docker compose exec postgres pg_isready -U loccali
+docker compose exec postgres pg_isready -U property_intelligence
 # output: /var/run/postgresql:5432 - accepting connections
 ```
 
@@ -95,7 +95,7 @@ Each script prints import counts on completion. Expect:
 
 ```bash
 # Via the admin CLI (or directly in psql for MVP)
-dotnet run --project src/Loccali.Api -- create-api-key --name "local-test"
+dotnet run --project src/PropertyIntelligence.Api -- create-api-key --name "local-test"
 # Output: API Key: lcc_test_abc123xyz...  (save this — shown once)
 ```
 
@@ -111,7 +111,7 @@ VALUES ('local-test', '<sha256hex>');
 ## Step 6 — Run the API
 
 ```bash
-dotnet run --project src/Loccali.Api
+dotnet run --project src/PropertyIntelligence.Api
 # Listening on http://localhost:5000
 ```
 
@@ -136,13 +136,13 @@ PT-BR `insight` string, and `analyzed_at` timestamp.
 
 ```bash
 # Unit tests (fast, no I/O)
-dotnet test tests/Loccali.Tests.Unit
+dotnet test tests/PropertyIntelligence.Tests.Unit
 
 # Contract tests (WireMock.Net stubs, no real HTTP)
-dotnet test tests/Loccali.Tests.Contract
+dotnet test tests/PropertyIntelligence.Tests.Contract
 
 # Integration tests (Testcontainers — needs Docker)
-dotnet test tests/Loccali.Tests.Integration
+dotnet test tests/PropertyIntelligence.Tests.Integration
 ```
 
 All three suites should pass before opening a PR.

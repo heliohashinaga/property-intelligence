@@ -62,7 +62,7 @@ identify which specific aspect of a property is its strength or weakness.
 
 **Why this priority**: Without dimensional transparency, the composite score is
 a black box. Dimension scores plus trend directions are what differentiate
-Loccali from raw data providers.
+Property Intelligence from raw data providers.
 
 **Independent Test**: Inspect the `score.dimensions` object in the response.
 Verify all 6 dimensions are present, each with `score`, `max`, and `trend`
