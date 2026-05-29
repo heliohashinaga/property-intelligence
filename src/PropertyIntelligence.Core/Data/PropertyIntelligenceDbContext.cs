@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using PropertyIntelligence.Core.Domain;
 
 namespace PropertyIntelligence.Core.Data;
@@ -89,6 +90,25 @@ public sealed class PropertyIntelligenceDbContext : DbContext
         });
 
         // ── property_analyses (append-only) ───────────────────────────────
+        // Value comparers for collection/JSONB properties — required by EF Core
+        // to detect changes correctly and suppress model validation warnings.
+        var dimensionScoresComparer = new ValueComparer<List<DimensionScore>>(
+            (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null)
+                   == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            c => JsonSerializer.Serialize(c, (JsonSerializerOptions?)null).GetHashCode(),
+            c => JsonSerializer.Deserialize<List<DimensionScore>>(JsonSerializer.Serialize(c, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null)!);
+
+        var warningsComparer = new ValueComparer<List<AnalysisWarning>>(
+            (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null)
+                   == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            c => JsonSerializer.Serialize(c, (JsonSerializerOptions?)null).GetHashCode(),
+            c => JsonSerializer.Deserialize<List<AnalysisWarning>>(JsonSerializer.Serialize(c, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null)!);
+
+        var stringListComparer = new ValueComparer<IReadOnlyList<string>>(
+            (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+            c => c.Aggregate(0, (h, v) => HashCode.Combine(h, v.GetHashCode())),
+            c => (IReadOnlyList<string>)c.ToList());
+
         mb.Entity<PropertyAnalysis>(e =>
         {
             e.ToTable("property_analyses");
@@ -134,14 +154,16 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("dimension_scores")
              .HasConversion(
                  v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                 v => JsonSerializer.Deserialize<List<DimensionScore>>(v, (JsonSerializerOptions?)null)!);
+                 v => JsonSerializer.Deserialize<List<DimensionScore>>(v, (JsonSerializerOptions?)null)!,
+                 dimensionScoresComparer);
 
             e.Property(a => a.Warnings)
              .IsRequired()
              .HasColumnType("jsonb")
              .HasConversion(
                  v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                 v => JsonSerializer.Deserialize<List<AnalysisWarning>>(v, (JsonSerializerOptions?)null)!);
+                 v => JsonSerializer.Deserialize<List<AnalysisWarning>>(v, (JsonSerializerOptions?)null)!,
+                 warningsComparer);
 
             // text[] columns
             e.Property(a => a.RiskFlags)
@@ -150,7 +172,8 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("risk_flags")
              .HasConversion(
                  v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => (IReadOnlyList<string>)v,
+                 stringListComparer);
 
             e.Property(a => a.OpportunityFlags)
              .IsRequired()
@@ -158,7 +181,8 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("opportunity_flags")
              .HasConversion(
                  v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => (IReadOnlyList<string>)v,
+                 stringListComparer);
 
             e.Property(a => a.ProvidersUsed)
              .IsRequired()
@@ -166,7 +190,8 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("providers_used")
              .HasConversion(
                  v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => (IReadOnlyList<string>)v,
+                 stringListComparer);
 
             e.Property(a => a.ProvidersUnavailable)
              .IsRequired()
@@ -174,7 +199,8 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("providers_unavailable")
              .HasConversion(
                  v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => (IReadOnlyList<string>)v,
+                 stringListComparer);
 
             e.Property(a => a.Insight).HasColumnName("insight");
             e.Property(a => a.InsightUnavailable)
