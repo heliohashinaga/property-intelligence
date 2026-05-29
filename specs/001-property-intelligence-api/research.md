@@ -234,20 +234,29 @@ municipality, lat/lng.
 
 ---
 
-## 10. Cloudflare Tunnel — Local Dev & Production
+## 10. Cloudflare Tunnel — Staging & Production
 
-**Decision**: `cloudflared` Docker container in `docker-compose.yml` for local
-tunnel during development. In production, `cloudflared` deployed as systemd
-service on the host or as a separate container.
+**Decision**: `cloudflared` Docker container managed via `infra/docker-compose.yml`
+(profile `tunnel`) for staging/public access. Not needed for local development —
+Aspire exposes services directly on localhost.
 
-**docker-compose.yml snippet**:
+In production, `cloudflared` deployed as a separate container on the host or
+via K3s manifest (see `infra/k3s/`).
+
+**docker-compose.yml snippet** (`infra/docker-compose.yml`, profile `tunnel`):
 ```yaml
 cloudflared:
   image: cloudflare/cloudflared:latest
-  command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-  restart: unless-stopped
-  depends_on:
-    - api
+  command: tunnel --no-autoupdate run
+  environment:
+    TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+  profiles:
+    - tunnel
+```
+
+Usage:
+```sh
+CLOUDFLARE_TUNNEL_TOKEN=<token> docker compose -f infra/docker-compose.yml --profile tunnel up -d
 ```
 
 **Cloudflare WAF rate limiting rule** (configured in Cloudflare dashboard):
@@ -349,20 +358,30 @@ do NOT fail the entire request.
 
 ## 15. .NET Aspire — Local Dev Orchestration
 
-**Decision**: Add `PropertyIntelligence.AppHost` project (Aspire AppHost) that orchestrates
-all .NET projects locally with service discovery, health dashboard, and
-OpenTelemetry built-in. Docker Compose remains for infrastructure services
-(PostgreSQL, Redis, Cloudflared).
+**Decision**: `PropertyIntelligence.AppHost` (Aspire AppHost) is the **sole**
+orchestrator for local development. It manages PostgreSQL+PostGIS, Redis, and
+the API with service discovery, health dashboard, and OpenTelemetry built-in.
+Docker Compose is **not** used for local dev — only for the Cloudflare tunnel
+(staging/public access, profile `tunnel`).
+
+Ports are fixed so migrations and import scripts work without extra config:
+- PostgreSQL: `5432` (`.WithHostPort(5432)`)
+- Redis: `6379` (`.WithHostPort(6379)`)
 
 **Rationale**: Aspire eliminates manual URL configuration between services,
 provides a live dashboard (traces, metrics, logs) during development, and emits
 OpenTelemetry natively — same signals go to Grafana Cloud in production.
 
 ```csharp
-// src/PropertyIntelligence.AppHost/Program.cs
-var builder = DistributedApplication.CreateBuilder(args);
-var api = builder.AddProject<Projects.PropertyIntelligence_Api>("api");
-builder.Build().Run();
+// src/PropertyIntelligence.AppHost/AppHost.cs
+var postgres = builder.AddPostgres("postgres")
+    .WithImage("postgis/postgis", "16-3.4")
+    .WithHostPort(5432)
+    .WithPgAdmin();
+var redis = builder.AddRedis("redis").WithHostPort(6379);
+builder.AddProject<Projects.PropertyIntelligence_Api>("api")
+    .WithReference(db).WithReference(redis)
+    .WaitFor(db).WaitFor(redis);
 ```
 
 **Developer workflow**: `dotnet run --project src/PropertyIntelligence.AppHost` →
