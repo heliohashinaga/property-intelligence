@@ -26,11 +26,11 @@ and confirmed failing before each implementation task.
 **Purpose**: Solution scaffolding, tooling, and local infrastructure.
 
 - [x] T001 Create .NET 10 solution with 6 projects: `PropertyIntelligence.Api`, `PropertyIntelligence.Core`, `PropertyIntelligence.Providers`, `PropertyIntelligence.Rules`, `PropertyIntelligence.Explainability`, `PropertyIntelligence.AppHost` (Aspire) under `src/`; and 3 test projects `PropertyIntelligence.Tests.Unit`, `PropertyIntelligence.Tests.Contract`, `PropertyIntelligence.Tests.Integration` under `tests/`
-- [x] T002 [P] Add NuGet packages per project: `Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite` + `NRules` (Core/Rules), `StackExchange.Redis` (Providers), `NetTopologySuite.IO.ShapeFile` (Providers, for shapefile import), `OpenTelemetry.Exporter.Otlp` + `OpenTelemetry.Instrumentation.AspNetCore` + `OpenTelemetry.Instrumentation.Http` (Api), `Aspire.Hosting` (AppHost), `xUnit` + `Testcontainers.PostgreSql` + `Testcontainers.Redis` + `WireMock.Net` + `FluentAssertions` (Tests)
-- [x] T003 [P] Create `infra/docker-compose.yml` with PostgreSQL 16 + PostGIS 3.4 (`postgis/postgis:16-3.4`) and Redis 7 services; add Docker Compose `healthcheck` for both; create `.env.example` with `DATABASE_URL`, `REDIS_URL`, `OPENROUTER_API_KEY`, `LLM_MODEL`, `IPTU_API_KEY`, `API_KEY_SALT`, `CLOUDFLARE_TUNNEL_TOKEN`, `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_OTLP_TOKEN`
+- [x] T002 [P] Add NuGet packages per project: `Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite` + `NRules` (Core/Rules), `StackExchange.Redis` (Providers), `NetTopologySuite.IO.ShapeFile` (Providers, for shapefile import), `OpenTelemetry.Exporter.Otlp` + `OpenTelemetry.Instrumentation.AspNetCore` + `OpenTelemetry.Instrumentation.Http` (Api), `Aspire.Hosting.PostgreSQL` + `Aspire.Hosting.Redis` (AppHost — SDK project, not `Aspire.Hosting`), `xUnit` + `Testcontainers.PostgreSql` + `Testcontainers.Redis` + `WireMock.Net` + `Shouldly` (Tests — Shouldly replaces FluentAssertions)
+- [x] T003 [P] Configure `src/PropertyIntelligence.AppHost/AppHost.cs` to orchestrate PostgreSQL+PostGIS (`postgis/postgis:16-3.4`, port 5432 fixed) and Redis (port 6379 fixed) via Aspire — **no docker-compose for Postgres/Redis**; create `infra/docker-compose.yml` with Cloudflare tunnel only (profile `tunnel`); create `.env.example` with `DATABASE_URL`, `REDIS_URL`, `OPENROUTER_API_KEY`, `LLM_MODEL`, `IPTU_API_KEY`, `API_KEY_SALT`, `CLOUDFLARE_TUNNEL_TOKEN`, `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_OTLP_TOKEN`
 - [x] T004 [P] Create `.github/workflows/ci.yml` with GitHub Actions pipeline: restore → build → unit tests → contract tests; integration tests on push to `main`; **NOTE: K3s deploy job is added separately in T073 (Phase 7) after the cluster is provisioned by T067 — do NOT add kubectl steps here yet**
 
-**Checkpoint**: `dotnet build` succeeds; `docker compose up -d` starts PostgreSQL and Redis healthy.
+**Checkpoint**: `dotnet build` succeeds; `dotnet run --project src/PropertyIntelligence.AppHost` starts PostgreSQL and Redis healthy (Aspire dashboard at http://localhost:15000).
 
 ---
 
@@ -164,8 +164,8 @@ and confirmed failing before each implementation task.
 - [ ] T062 [P] Write integration test for graceful degradation in `tests/PropertyIntelligence.Tests.Integration/PropertyAnalysisIntegrationTests.cs`; configure WireMock.Net to return 503 for `ssp_sp` provider; assert: HTTP 200 returned, `score.max == 800`, `warnings` has 1 entry, `providers_unavailable` contains `ssp_sp`
 - [ ] T063 [P] Write `data/import/README.md` documenting all 4 import scripts (ANA, IBGE, INEP, CNES, SSP-SP); include expected row counts, re-run cadence, and manual cron setup instructions
 - [ ] T064 Run `quickstart.md` validation checklist end-to-end; check all 7 items pass; update `quickstart.md` with any corrections found
-- [ ] T065 [P] Wire .NET Aspire AppHost in `src/PropertyIntelligence.AppHost/Program.cs` (project created in T001); register `PropertyIntelligence.Api`; verify Aspire dashboard at `http://localhost:15000` shows traces and health; can be done as early as Phase 1 if preferred for better local dev experience
-- [ ] T066 [P] Add Cloudflare Tunnel container to `infra/docker-compose.yml` (`cloudflare/cloudflared:latest`) with `CLOUDFLARE_TUNNEL_TOKEN` env var
+- [x] T065 [P] Wire .NET Aspire AppHost in `src/PropertyIntelligence.AppHost/AppHost.cs`; registers Postgres+PostGIS (port 5432), Redis (port 6379), and `PropertyIntelligence.Api` with service discovery and `WaitFor` health gates; Aspire dashboard at `http://localhost:15000` — **done in Phase 2**
+- [x] T066 [P] Add Cloudflare Tunnel container to `infra/docker-compose.yml` (`cloudflare/cloudflared:latest`, profile `tunnel`) with `CLOUDFLARE_TUNNEL_TOKEN` env var — **done in Phase 2; docker-compose is tunnel-only**
 - [ ] T082 Add performance validation to integration tests in `tests/PropertyIntelligence.Tests.Integration/PropertyAnalysisIntegrationTests.cs`; use `Stopwatch` to assert SC-001 (non-cached ≤ 8s) and SC-002 (cached ≤ 500ms); also create `data/benchmark/smoke.sh` using `oha` or `curl` for manual p95 latency check
 
 ---
