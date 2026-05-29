@@ -17,8 +17,8 @@
 | T006 — Domain value types (PropertyAddress, DimensionScore, AnalysisWarning) | ✅ Done | `Core/Domain/` |
 | T007 — Entity types (PropertyAnalysis, ApiConsumer, DataProviderRawLog) | ✅ Done | `Core/Domain/` |
 | T008 — PropertyProfile aggregate + provider sub-records | ✅ Done | `Core/Domain/PropertyProfile.cs` |
-| T009 — PropertyIntelligenceDbContext | 🔄 In progress | Slice A |
-| T010 — SQL migrations (001–005) | 🔄 In progress | Slice A |
+| T009 — PropertyIntelligenceDbContext | ✅ Done | `Core/Data/PropertyIntelligenceDbContext.cs` |
+| T010 — SQL migrations (001–005) | ✅ Done | `infra/migrations/001–005 .sql + run.sh` |
 | T011 — CacheService + CacheKeyHelper | ✅ Done | `Providers/Shared/` |
 | T012 — ApiKeyAuthMiddleware | 🔄 In progress | Slice C |
 | T013 — GET /health endpoint | 🔄 In progress | Slice C |
