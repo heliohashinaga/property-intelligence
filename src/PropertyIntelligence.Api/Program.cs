@@ -23,9 +23,22 @@ builder.Logging.AddJsonConsole(opts =>
 });
 
 // ── PostgreSQL / EF Core ──────────────────────────────────────────────────────
-var databaseUrl = builder.Configuration["DATABASE_URL"]
+// Aspire injects ConnectionStrings__property-intelligence-db (Npgsql format).
+// Fallback: DATABASE_URL env var (postgres://user:pass@host:port/db format).
+var aspireConnStr = builder.Configuration.GetConnectionString("property-intelligence-db");
+var databaseUrl   = aspireConnStr
+    ?? builder.Configuration["DATABASE_URL"]
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? "Host=localhost;Database=property_intelligence;Username=property_intelligence;Password=property_intelligence";
+
+// Convert postgres:// URL → Npgsql connection string when not in Aspire mode
+if (aspireConnStr == null && databaseUrl.StartsWith("postgres"))
+{
+    var uri  = new Uri(databaseUrl);
+    var info = uri.UserInfo.Split(':');
+    databaseUrl = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};" +
+                  $"Username={info[0]};Password={info[1]}";
+}
 
 builder.Services.AddDbContext<PropertyIntelligenceDbContext>(opts =>
     opts.UseNpgsql(databaseUrl,
@@ -33,13 +46,16 @@ builder.Services.AddDbContext<PropertyIntelligenceDbContext>(opts =>
     ServiceLifetime.Scoped);
 
 // ── Redis ─────────────────────────────────────────────────────────────────────
-var redisUrl = (builder.Configuration["REDIS_URL"]
-    ?? Environment.GetEnvironmentVariable("REDIS_URL")
-    ?? "redis://localhost:6379")
-    .Replace("redis://", "");
+// Aspire injects ConnectionStrings__redis (host:port format).
+// Fallback: REDIS_URL env var (redis://host:port format).
+var redisConnStr = builder.Configuration.GetConnectionString("redis")
+    ?? (builder.Configuration["REDIS_URL"]
+        ?? Environment.GetEnvironmentVariable("REDIS_URL")
+        ?? "redis://localhost:6379")
+       .Replace("redis://", "");
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(redisUrl));
+    ConnectionMultiplexer.Connect(redisConnStr));
 
 // ── OpenTelemetry — OTLP exporter (T039 will wire remaining instrumentations) ─
 var otlpEndpoint = builder.Configuration["GRAFANA_OTLP_ENDPOINT"]
