@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PropertyIntelligence.Api/PropertyIntelligence.Api.csproj" />
+    <Project Path="src/PropertyIntelligence.AppHost/PropertyIntelligence.AppHost.csproj" />
+    <Project Path="src/PropertyIntelligence.Core/PropertyIntelligence.Core.csproj" />
+    <Project Path="src/PropertyIntelligence.Explainability/PropertyIntelligence.Explainability.csproj" />
+    <Project Path="src/PropertyIntelligence.Providers/PropertyIntelligence.Providers.csproj" />
+    <Project Path="src/PropertyIntelligence.Rules/PropertyIntelligence.Rules.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PropertyIntelligence.Tests.Contract/PropertyIntelligence.Tests.Contract.csproj" />
+    <Project Path="tests/PropertyIntelligence.Tests.Integration/PropertyIntelligence.Tests.Integration.csproj" />
+    <Project Path="tests/PropertyIntelligence.Tests.Unit/PropertyIntelligence.Tests.Unit.csproj" />
+  </Folder>
+</Solution>
