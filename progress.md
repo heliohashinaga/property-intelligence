@@ -23,10 +23,10 @@
 | T012 — ApiKeyAuthMiddleware | 🔄 In progress | Slice C |
 | T013 — GET /health endpoint | 🔄 In progress | Slice C |
 | T058 — Structured JSON logging middleware | 🔄 In progress | Slice C |
-| T074 — ANA shapefile import script | 🔄 In progress | Slice D |
-| T075 — IBGE CNEFE import script | 🔄 In progress | Slice D |
-| T076 — INEP IDEB import script | 🔄 In progress | Slice D |
-| T077 — CNES import script | 🔄 In progress | Slice D |
+| T074 — ANA shapefile import script | ✅ Done | `data/import/ana_shapefile_import.sh` |
+| T075 — IBGE CNEFE import script | ✅ Done | `data/import/ibge_cnefe_import.sh` |
+| T076 — INEP IDEB import script | ✅ Done | `data/import/inep_ideb_import.sh` |
+| T077 — CNES import script | ✅ Done | `data/import/cnes_import.sh` |
 | T014 — Run static dataset imports | ⏳ Blocked | Depends on T074–T077 + Docker up |
 
 ## Blocked
