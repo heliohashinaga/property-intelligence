@@ -119,7 +119,7 @@ The project constitution lives at `.specify/memory/constitution.md`.
 | Rules Engine | NRules |
 | Database | PostgreSQL + PostGIS |
 | Cache | Redis |
-| AI | Claude API (Anthropic) |
+| AI | OpenRouter (model via `LLM_MODEL` env var — swap without code changes) |
 | Frontend | Vue.js + Chart.js + Leaflet |
 | Dev infra | Docker Compose |
 | CI/CD | GitHub Actions |
