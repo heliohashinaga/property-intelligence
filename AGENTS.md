@@ -14,6 +14,73 @@ Key artifacts:
 
 # Property Intelligence — Agent Guidance
 
+**This repository mandates multi-agent as the development default.**
+
+- All significant implementation, refactor, test, and release tasks SHALL be executed using multi-agent delegation (pi-subagents, pi-messenger crew, or equivalent orchestration pattern).
+- No single-agent feature branches unless justified by unique coupling or strategic need; vertical slices and concurrency are the norm.
+- Keep this instruction at the top — future contributors and agents MUST follow multi-agent as the workflow baseline.
+
+## Multi-Agent Execution Standard
+
+### Git Worktree is mandatory for parallel agent execution
+
+Every agent working in parallel on this repository **MUST** operate in its own isolated git worktree.
+This is the industry-established standard (adopted by Claude Code, OpenAI Codex, Cursor, pi-subagents).
+
+**Why:**
+- Eliminates file-level conflicts between concurrent agents sharing the same repo.
+- Lightweight: shares the single `.git` object store — no disk bloat from full clones.
+- Clean merge history: each worktree lives on its own branch; integration is straightforward.
+- Natively supported by pi-subagents via `worktree: true`.
+
+### Worktree setup per agent/slice
+
+```sh
+# Create a worktree for a slice (run from repo root)
+git worktree add ../property-intelligence-<slice-name> main
+
+# Example: one worktree per provider
+git worktree add ../property-intelligence-viacep main
+git worktree add ../property-intelligence-overpass main
+git worktree add ../property-intelligence-ana main
+
+# List active worktrees
+git worktree list
+
+# Remove after merge
+git worktree remove ../property-intelligence-<slice-name>
+```
+
+### pi-subagents parallel config with worktree
+
+```json
+{
+  "tasks": [
+    { "agent": "worker", "task": "Implement ViaCepProvider" },
+    { "agent": "worker", "task": "Implement OverpassPoiProvider" },
+    { "agent": "worker", "task": "Implement AnaFloodRiskProvider" }
+  ],
+  "worktree": true
+}
+```
+
+### Known limitations & mitigations
+
+| Issue | Mitigation |
+|---|---|
+| Port conflicts (dotnet watch, etc.) | Each agent uses a distinct port via env var |
+| Shared Redis/Postgres in dev | Use Docker Compose with named containers; agents share infra but not workspace |
+| `.env` collisions | Each worktree gets its own `.env` (gitignored); copy from `.env.example` on setup |
+
+### Merge flow
+
+1. Agent finishes work → commits to its own branch inside its worktree.
+2. Orchestrator (main session or human) reviews diff.
+3. PR created via `gh pr create --fill --base main` from within the worktree.
+4. PR approved → merge → worktree removed.
+
+---
+
 This file is the runtime reference for AI agents working on this codebase.
 Read it before making any changes. It supersedes ad-hoc guesses.
 
@@ -59,18 +126,18 @@ The project constitution lives at `.specify/memory/constitution.md`.
 ## Project Structure
 
 ```
-loccali/
+property-intelligence/
 ├── src/
-│   ├── Loccali.Api/              # Minimal API — endpoints, middleware, auth
-│   ├── Loccali.Core/             # Domain entities, interfaces, engine contracts
-│   ├── Loccali.Providers/        # IDataProvider<T> implementations (one per source)
-│   ├── Loccali.Rules/            # NRules scoring rules per dimension
-│   ├── Loccali.Explainability/   # LlmExplainabilityService → OpenRouter
-│   └── Loccali.AppHost/          # .NET Aspire local dev orchestrator
+│   ├── PropertyIntelligence.Api/              # Minimal API — endpoints, middleware, auth
+│   ├── PropertyIntelligence.Core/             # Domain entities, interfaces, engine contracts
+│   ├── PropertyIntelligence.Providers/        # IDataProvider<T> implementations (one per source)
+│   ├── PropertyIntelligence.Rules/            # NRules scoring rules per dimension
+│   ├── PropertyIntelligence.Explainability/   # LlmExplainabilityService → OpenRouter
+│   └── PropertyIntelligence.AppHost/          # .NET Aspire local dev orchestrator
 ├── tests/
-│   ├── Loccali.Tests.Contract/     # Provider contract tests (WireMock.Net)
-│   ├── Loccali.Tests.Integration/  # End-to-end API tests (Testcontainers)
-│   └── Loccali.Tests.Unit/         # Domain logic unit tests
+│   ├── PropertyIntelligence.Tests.Contract/     # Provider contract tests (WireMock.Net)
+│   ├── PropertyIntelligence.Tests.Integration/  # End-to-end API tests (Testcontainers)
+│   └── PropertyIntelligence.Tests.Unit/         # Domain logic unit tests
 ├── frontend/                   # Vue.js 3 + Chart.js + Leaflet
 ├── infra/
 │   ├── docker-compose.yml        # PostgreSQL+PostGIS, Redis, Cloudflared (dev)
@@ -92,7 +159,7 @@ loccali/
 
 ## Core Abstractions
 
-### `IDataProvider<TResult>` (Loccali.Core)
+### `IDataProvider<TResult>` (PropertyIntelligence.Core)
 
 Every external data source is an isolated provider implementing this interface:
 
@@ -197,19 +264,19 @@ fail the full request because one source is down.
 docker compose up -d
 
 # Start .NET Aspire — orchestrates all .NET projects + live dashboard
-dotnet run --project src/Loccali.AppHost
+dotnet run --project src/PropertyIntelligence.AppHost
 # Aspire dashboard: http://localhost:15000 (traces, logs, health)
 
 # Run the API only (without Aspire)
-dotnet watch run --project src/Loccali.Api
+dotnet watch run --project src/PropertyIntelligence.Api
 
 # Run all tests
 dotnet test
 
 # Run by layer
-dotnet test tests/Loccali.Tests.Unit        # fast, no I/O
-dotnet test tests/Loccali.Tests.Contract    # WireMock.Net stubs
-dotnet test tests/Loccali.Tests.Integration # Testcontainers — needs Docker
+dotnet test tests/PropertyIntelligence.Tests.Unit        # fast, no I/O
+dotnet test tests/PropertyIntelligence.Tests.Contract    # WireMock.Net stubs
+dotnet test tests/PropertyIntelligence.Tests.Integration # Testcontainers — needs Docker
 
 # Apply database migrations
 sh infra/migrations/run.sh
@@ -219,7 +286,7 @@ cd infra/tofu && tofu init && tofu apply
 
 # Deploy to K3s (after tofu apply provides kubeconfig)
 kubectl apply -f infra/k3s/
-kubectl rollout status deployment/loccali-api -n loccali
+kubectl rollout status deployment/property-intelligence-api -n property-intelligence
 
 # Import static datasets (one-time + on source updates)
 sh data/import/ana_shapefile_import.sh
@@ -272,7 +339,7 @@ Specs, plans, contracts, and tasks are committed alongside source code.
 
 ```sh
 # Database (dev: Docker Compose | staging: Supabase | prod: K3s StatefulSet)
-DATABASE_URL=postgres://loccali:loccali@localhost:5432/loccali
+DATABASE_URL=postgres://property_intelligence:property_intelligence@localhost:5432/property_intelligence
 
 # Cache
 REDIS_URL=redis://localhost:6379
