@@ -49,17 +49,10 @@ public sealed class PropertyIntelligenceDbContext : DbContext
             e.Property(a => a.PostalCode)
              .HasColumnType("varchar(8)")
              .HasColumnName("postal_code");
-            e.Property(a => a.Lat)
-             .HasColumnType("numeric(9,6)")
-             .HasColumnName("lat");
-            e.Property(a => a.Lng)
-             .HasColumnType("numeric(9,6)")
-             .HasColumnName("lng");
-
-            // PostGIS geometry column — managed by NetTopologySuite at query time;
-            // the column itself is defined in the SQL migration.
-            e.Ignore(a => a.Lat); // lat/lng stored as PostGIS geometry(Point,4326)
-            e.Ignore(a => a.Lng); // raw doubles duplicated in the geometry column
+            // Lat/Lng são armazenados como PostGIS geometry(Point,4326) no banco.
+            // Ignorar no EF Core — leitura/escrita via SQL raw ou projeção manual.
+            e.Ignore(a => a.Lat);
+            e.Ignore(a => a.Lng);
 
             e.Property(a => a.CreatedAt)
              .HasColumnName("created_at")
@@ -201,7 +194,6 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("cached")
              .HasDefaultValue(false);
             e.Property(a => a.RequestIp)
-             .HasColumnType("inet")
              .HasColumnName("request_ip");
             e.Property(a => a.CreatedAt)
              .IsRequired()
