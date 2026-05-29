@@ -260,12 +260,12 @@ fail the full request because one source is down.
 ## Development Commands
 
 ```sh
-# Start local infrastructure (PostgreSQL+PostGIS, Redis, Cloudflared)
-docker compose up -d
-
-# Start .NET Aspire — orchestrates all .NET projects + live dashboard
+# Start .NET Aspire — orchestrates PostgreSQL+PostGIS, Redis, API + live dashboard
+# PostgreSQL: port 5432 (fixed) | Redis: port 6379 (fixed) | Dashboard: http://localhost:15000
 dotnet run --project src/PropertyIntelligence.AppHost
-# Aspire dashboard: http://localhost:15000 (traces, logs, health)
+
+# Cloudflare tunnel only (staging/public access — not needed for local dev)
+# CLOUDFLARE_TUNNEL_TOKEN=<token> docker compose -f infra/docker-compose.yml --profile tunnel up -d
 
 # Run the API only (without Aspire)
 dotnet watch run --project src/PropertyIntelligence.Api

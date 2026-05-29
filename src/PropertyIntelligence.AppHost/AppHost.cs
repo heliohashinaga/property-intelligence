@@ -12,6 +12,7 @@ var postgres = builder
     .WithImage("postgis/postgis", "16-3.4")
     .WithEnvironment("POSTGRES_DB", "property_intelligence")
     .WithDataVolume("property-intelligence-postgres-data")
+    .WithHostPort(5432)             // fixed port — migrations & import scripts depend on it
     .WithPgAdmin();                 // optional pgAdmin UI on a random port
 
 var db = postgres.AddDatabase("property-intelligence-db", "property_intelligence");
@@ -19,7 +20,8 @@ var db = postgres.AddDatabase("property-intelligence-db", "property_intelligence
 // ── Redis ─────────────────────────────────────────────────────────────────────
 var redis = builder
     .AddRedis("redis")
-    .WithDataVolume("property-intelligence-redis-data");
+    .WithDataVolume("property-intelligence-redis-data")
+    .WithHostPort(6379);            // fixed port — consistent with .env.example
 
 // ── API ───────────────────────────────────────────────────────────────────────
 builder

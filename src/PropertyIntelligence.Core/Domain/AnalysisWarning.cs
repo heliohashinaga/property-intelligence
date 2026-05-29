@@ -3,7 +3,7 @@ namespace PropertyIntelligence.Core.Domain;
 /// <summary>
 /// A human-readable warning attached to a property analysis.
 /// Stored as JSONB in <c>property_analyses.warnings</c>.
-/// All messages are in PT-BR.
+/// All messages are in English.
 /// </summary>
 public sealed record AnalysisWarning
 {
@@ -13,7 +13,7 @@ public sealed record AnalysisWarning
     /// </summary>
     public required string Code { get; init; }
 
-    /// <summary>PT-BR human-readable message for the end user.</summary>
+    /// <summary>Human-readable message for the end user (English).</summary>
     public required string Message { get; init; }
 
     /// <summary>
@@ -28,7 +28,7 @@ public sealed record AnalysisWarning
         new()
         {
             Code      = "provider_unavailable",
-            Message   = $"Dados de {providerName} indisponíveis no momento. A dimensão '{dimension}' foi excluída do cálculo.",
+            Message   = $"Data from '{providerName}' is currently unavailable. The '{dimension}' dimension was excluded from the score.",
             Dimension = dimension
         };
 
@@ -36,6 +36,6 @@ public sealed record AnalysisWarning
         new()
         {
             Code    = "insight_unavailable",
-            Message = "Explicação indisponível no momento. O score e as dimensões estão completos.",
+            Message = "Insight generation is temporarily unavailable. The score and all dimensions are complete.",
         };
 }

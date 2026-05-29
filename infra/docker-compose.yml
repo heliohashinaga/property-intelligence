@@ -1,43 +1,17 @@
+# docker-compose.yml — Cloudflare Tunnel only
+#
+# PostgreSQL, Redis, and the API are now fully managed by .NET Aspire (AppHost).
+# Use this file only when you need the Cloudflare tunnel for staging/public access.
+#
+# Usage:
+#   CLOUDFLARE_TUNNEL_TOKEN=<token> docker compose --profile tunnel up -d
+
 services:
-  postgres:
-    image: postgis/postgis:16-3.4
-    container_name: property-intelligence-postgres
-    environment:
-      POSTGRES_USER: property_intelligence
-      POSTGRES_PASSWORD: property_intelligence
-      POSTGRES_DB: property_intelligence
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U property_intelligence"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: property-intelligence-redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: property-intelligence-cloudflared
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - postgres
-      - redis
     profiles:
       - tunnel
-
-volumes:
-  postgres_data:

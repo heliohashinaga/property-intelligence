@@ -41,14 +41,25 @@ CLOUDFLARE_TUNNEL_TOKEN=...   # optional for local dev; leave blank to skip tunn
 ## Step 2 — Start infrastructure
 
 ```bash
-docker compose up -d postgres redis
+# Aspire manages PostgreSQL, Redis, and the API — one command starts everything:
+dotnet run --project src/PropertyIntelligence.AppHost
 ```
 
-Wait for PostgreSQL to be ready:
+Aspire dashboard: **http://localhost:15000** (traces, logs, health of every resource)
+
+> PostgreSQL is exposed on **port 5432** and Redis on **port 6379** (fixed) so
+> migrations and import scripts work without extra config.
+
+Wait for PostgreSQL to be ready (Aspire shows a green health badge, or check manually):
 ```bash
-docker compose exec postgres pg_isready -U property_intelligence
-# output: /var/run/postgresql:5432 - accepting connections
+docker exec property-intelligence-postgres pg_isready -U property_intelligence
+# /var/run/postgresql:5432 - accepting connections
 ```
+
+> **Cloudflare tunnel only** (staging/public access):
+> ```bash
+> CLOUDFLARE_TUNNEL_TOKEN=<token> docker compose -f infra/docker-compose.yml --profile tunnel up -d
+> ```
 
 ---
 
@@ -178,7 +189,7 @@ After completing the steps above, verify:
 
 ## Common Issues
 
-**Docker postgres not ready**: Wait 10–15 seconds after `docker compose up` before running migrations.
+**Aspire not starting**: Check that port 15000 is free (`lsof -i :15000`). Aspire assigns random ports for pgAdmin; find them in the dashboard.
 
 **ANA shapefile import fails**: Install GDAL (`sudo apt install gdal-bin` or `brew install gdal`) for `ogr2ogr`.
 

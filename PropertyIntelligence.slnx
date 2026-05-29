@@ -8,6 +8,7 @@
     <Project Path="src/PropertyIntelligence.Rules/PropertyIntelligence.Rules.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/PropertyIntelligence.Tests.Architecture/PropertyIntelligence.Tests.Architecture.csproj" />
     <Project Path="tests/PropertyIntelligence.Tests.Contract/PropertyIntelligence.Tests.Contract.csproj" />
     <Project Path="tests/PropertyIntelligence.Tests.Integration/PropertyIntelligence.Tests.Integration.csproj" />
     <Project Path="tests/PropertyIntelligence.Tests.Unit/PropertyIntelligence.Tests.Unit.csproj" />
