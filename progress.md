@@ -20,9 +20,9 @@
 | T009 — PropertyIntelligenceDbContext | ✅ Done | `Core/Data/PropertyIntelligenceDbContext.cs` |
 | T010 — SQL migrations (001–005) | ✅ Done | `infra/migrations/001–005 .sql + run.sh` |
 | T011 — CacheService + CacheKeyHelper | ✅ Done | `Providers/Shared/` |
-| T012 — ApiKeyAuthMiddleware | 🔄 In progress | Slice C |
-| T013 — GET /health endpoint | 🔄 In progress | Slice C |
-| T058 — Structured JSON logging middleware | 🔄 In progress | Slice C |
+| T012 — ApiKeyAuthMiddleware | ✅ Done | `Api/Middleware/ApiKeyAuthMiddleware.cs` |
+| T013 — GET /health endpoint | ✅ Done | `Api/Endpoints/HealthEndpoint.cs` |
+| T058 — Structured JSON logging middleware | ✅ Done | `Api/Program.cs` (JSON console + correlation ID) |
 | T074 — ANA shapefile import script | ✅ Done | `data/import/ana_shapefile_import.sh` |
 | T075 — IBGE CNEFE import script | ✅ Done | `data/import/ibge_cnefe_import.sh` |
 | T076 — INEP IDEB import script | ✅ Done | `data/import/inep_ideb_import.sh` |
@@ -36,8 +36,8 @@
 
 ## Next
 
-- Merge Slice A (T009+T010), Slice C (T012+T013+T058), Slice D (T074-T077) into `feat/phase-2`
 - Fix Docker IPv4 issue (see Blocked above)
 - Run migrations: `sh infra/migrations/run.sh`
-- Verify `GET /health` returns `{"status":"healthy"}`
+- Verify `GET /health` returns `{"status":"healthy"}` — Phase 2 checkpoint
+- Mark T005–T013, T058, T074–T077 [x] in tasks.md
 - Start Phase 3: US1 (T015–T039)
