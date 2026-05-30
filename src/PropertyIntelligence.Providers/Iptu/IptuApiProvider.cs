@@ -62,11 +62,19 @@ public sealed class IptuApiProvider : IDataProvider<IptuData?>
     {
         try
         {
-            var apiKey  = _config["IPTU_API_KEY"] ?? string.Empty;
-            var query   = BuildQuery(address);
-            var client  = _http.CreateClient("iptu_api");
-            var url     = $"v1/property?address={Uri.EscapeDataString(query)}&api_key={Uri.EscapeDataString(apiKey)}";
-            var response = await client.GetAsync(url, ct).ConfigureAwait(false);
+            var apiKey = _config["IPTU_API_KEY"] ?? string.Empty;
+            var cidade = NormalizeCidade(address.City);
+            var endereco = BuildQuery(address);
+
+            // Real endpoint: GET /v1/imoveis/busca?endereco={addr}&cidade={slug}
+            // Auth: Authorization: Bearer {key}  (NOT query param)
+            var url = $"v1/imoveis/busca?endereco={Uri.EscapeDataString(endereco)}&cidade={Uri.EscapeDataString(cidade)}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+
+            var client   = _http.CreateClient("iptuapi");
+            var response = await client.SendAsync(request, ct).ConfigureAwait(false);
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -84,7 +92,7 @@ public sealed class IptuApiProvider : IDataProvider<IptuData?>
 
             return new IptuData
             {
-                ValorVenal = dto.ValorVenal,
+                ValorVenal  = dto.ValorVenal,
                 ZoningClass = dto.Zoneamento,
                 // AppreciationTrend populated in US2 (Phase 4)
             };
@@ -102,7 +110,20 @@ public sealed class IptuApiProvider : IDataProvider<IptuData?>
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(address.StreetName))   parts.Add(address.StreetName);
         if (!string.IsNullOrWhiteSpace(address.StreetNumber)) parts.Add(address.StreetNumber);
-        if (!string.IsNullOrWhiteSpace(address.City))         parts.Add(address.City);
         return string.Join(" ", parts);
+    }
+
+    /// <summary>Converts city name to the slug expected by iptuapi.com.br (e.g. "São Paulo" → "sao-paulo").</summary>
+    private static string NormalizeCidade(string city)
+    {
+        if (string.IsNullOrWhiteSpace(city)) return "sao-paulo"; // default
+        return city.ToLowerInvariant()
+            .Replace("ã", "a").Replace("â", "a").Replace("á", "a")
+            .Replace("ê", "e").Replace("é", "e")
+            .Replace("í", "i")
+            .Replace("õ", "o").Replace("ô", "o").Replace("ó", "o")
+            .Replace("ú", "u").Replace("ü", "u")
+            .Replace("ç", "c")
+            .Replace(" ", "-");
     }
 }

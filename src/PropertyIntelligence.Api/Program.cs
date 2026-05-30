@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Http.Resilience;
 using NRules;
+using Polly;
 using NRules.Fluent;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -57,12 +59,22 @@ if (aspireConnStr == null && databaseUrl.StartsWith("postgres"))
 }
 
 builder.Services.AddDbContext<PropertyIntelligenceDbContext>(opts =>
-    opts.UseNpgsql(databaseUrl,
-        npgsql => npgsql.UseNetTopologySuite()),
+    opts.UseNpgsql(databaseUrl, npgsql =>
+    {
+        npgsql.UseNetTopologySuite();
+        npgsql.EnableRetryOnFailure(maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null);  // retries on transient Npgsql errors
+    }),
     ServiceLifetime.Scoped);
 builder.Services.AddDbContextFactory<PropertyIntelligenceDbContext>(opts =>
-    opts.UseNpgsql(databaseUrl,
-        npgsql => npgsql.UseNetTopologySuite()),
+    opts.UseNpgsql(databaseUrl, npgsql =>
+    {
+        npgsql.UseNetTopologySuite();
+        npgsql.EnableRetryOnFailure(maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null);
+    }),
     ServiceLifetime.Scoped);
 
 // ── Redis ─────────────────────────────────────────────────────────────────────
@@ -99,6 +111,11 @@ builder.Services.AddSingleton<ISessionFactory>(ruleRepository.Compile());
 builder.Services.AddScoped<IPropertyAnalysisEngine, PropertyAnalysisEngine>();
 
 // LLM explainability (T035)
+// ── HTTP Clients com resiliência (Polly v8 via Microsoft.Extensions.Http.Resilience) ──
+// Cada cliente tem retry + circuit breaker calibrados para o SLA do provider.
+// O SafeFetchAsync do EnrichmentModule ainda impõe o timeout global de 5s por provider.
+
+// OpenRouter (LLM) — best-effort, sem retry (falha silenciosa é comportamento correto)
 builder.Services.AddHttpClient("openrouter", client =>
 {
     client.DefaultRequestHeaders.Add("Authorization",
@@ -107,10 +124,106 @@ builder.Services.AddHttpClient("openrouter", client =>
     client.DefaultRequestHeaders.Add("X-Title", "Property Intelligence");
     client.Timeout = TimeSpan.FromSeconds(12);
 });
-builder.Services.AddHttpClient("viacep",   c => c.BaseAddress = new Uri("https://viacep.com.br"));
-builder.Services.AddHttpClient("nominatim",c => { c.BaseAddress = new Uri("https://nominatim.openstreetmap.org"); c.DefaultRequestHeaders.Add("User-Agent", "PropertyIntelligence/1.0 (contact@hashinaga.dev)"); });
-builder.Services.AddHttpClient("overpass", c => c.BaseAddress = new Uri("https://overpass-api.de"));
-builder.Services.AddHttpClient("iptuapi",  c => c.BaseAddress = new Uri("https://api.iptuapi.com.br"));
+// Sem resilience handler no LLM — timeout do HttpClient é suficiente
+
+// ViaCEP — lookup determinístico, 2 retries com backoff de 500ms
+builder.Services.AddHttpClient("viacep", c => c.BaseAddress = new Uri("https://viacep.com.br"))
+    .AddResilienceHandler("viacep-resilience", pipeline =>
+    {
+        pipeline.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 2,
+            Delay            = TimeSpan.FromMilliseconds(500),
+            BackoffType      = DelayBackoffType.Exponential,
+            UseJitter        = true,
+            ShouldHandle     = args => ValueTask.FromResult(
+                args.Outcome.Exception is HttpRequestException ||
+                (int?)args.Outcome.Result?.StatusCode >= 500),
+        });
+        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+        {
+            SamplingDuration       = TimeSpan.FromSeconds(30),
+            FailureRatio           = 0.5,
+            MinimumThroughput      = 5,
+            BreakDuration          = TimeSpan.FromSeconds(15),
+        });
+        pipeline.AddTimeout(TimeSpan.FromSeconds(3));
+    });
+
+// Nominatim (OSM) — rate-limited externamente; 1 retry, timeout conservador
+builder.Services.AddHttpClient("nominatim", c =>
+{
+    c.BaseAddress = new Uri("https://nominatim.openstreetmap.org");
+    c.DefaultRequestHeaders.Add("User-Agent", "PropertyIntelligence/1.0 (contact@hashinaga.dev)");
+})
+    .AddResilienceHandler("nominatim-resilience", pipeline =>
+    {
+        pipeline.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 1,
+            Delay            = TimeSpan.FromSeconds(1),
+            BackoffType      = DelayBackoffType.Constant,
+            ShouldHandle     = args => ValueTask.FromResult(
+                args.Outcome.Exception is HttpRequestException ||
+                (int?)args.Outcome.Result?.StatusCode >= 500),
+        });
+        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+        {
+            SamplingDuration  = TimeSpan.FromSeconds(30),
+            FailureRatio      = 0.5,
+            MinimumThroughput = 3,
+            BreakDuration     = TimeSpan.FromSeconds(20),
+        });
+        pipeline.AddTimeout(TimeSpan.FromSeconds(4));
+    });
+
+// Overpass (OSM) — pode ser lento em pico; 2 retries com backoff
+builder.Services.AddHttpClient("overpass", c => c.BaseAddress = new Uri("https://overpass-api.de"))
+    .AddResilienceHandler("overpass-resilience", pipeline =>
+    {
+        pipeline.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 2,
+            Delay            = TimeSpan.FromSeconds(1),
+            BackoffType      = DelayBackoffType.Exponential,
+            UseJitter        = true,
+            ShouldHandle     = args => ValueTask.FromResult(
+                args.Outcome.Exception is HttpRequestException ||
+                (int?)args.Outcome.Result?.StatusCode is 429 or >= 500),
+        });
+        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+        {
+            SamplingDuration  = TimeSpan.FromSeconds(30),
+            FailureRatio      = 0.5,
+            MinimumThroughput = 5,
+            BreakDuration     = TimeSpan.FromSeconds(20),
+        });
+        pipeline.AddTimeout(TimeSpan.FromSeconds(4));
+    });
+
+// IPTU API — free tier com limite de quota; 1 retry, circuit breaker agressivo
+builder.Services.AddHttpClient("iptuapi", c => c.BaseAddress = new Uri("https://api.iptuapi.com.br"))
+    .AddResilienceHandler("iptuapi-resilience", pipeline =>
+    {
+        pipeline.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 1,
+            Delay            = TimeSpan.FromSeconds(1),
+            BackoffType      = DelayBackoffType.Constant,
+            ShouldHandle     = args => ValueTask.FromResult(
+                args.Outcome.Exception is HttpRequestException ||
+                (int?)args.Outcome.Result?.StatusCode is >= 500),
+            // 404 não é retried — IPTU não encontrado é resultado válido
+        });
+        pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+        {
+            SamplingDuration  = TimeSpan.FromSeconds(60),
+            FailureRatio      = 0.6,
+            MinimumThroughput = 3,
+            BreakDuration     = TimeSpan.FromSeconds(30),
+        });
+        pipeline.AddTimeout(TimeSpan.FromSeconds(3));
+    });
 builder.Services.AddScoped<IExplainabilityService, LlmExplainabilityService>();
 
 // Raw log repository (EF-backed)

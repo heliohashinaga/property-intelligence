@@ -82,14 +82,18 @@ public sealed class OverpassPoiProvider : IDataProvider<PoiData>
     private static string BuildOverpassQuery(double lat, double lng)
     {
         // Query for transit and amenity POIs within 2km radius
-        // Tags used: railway=station station=subway, highway=bus_stop,
-        //            amenity=hospital, amenity=school, amenity=pharmacy, amenity=clinic
+        // Tags: São Paulo metro uses railway=subway OR railway=station[station=subway] OR public_transport=platform
+        //       Bus stops: highway=bus_stop OR public_transport=stop_position
         return $"""
             [out:json][timeout:25];
             (
+              node["railway"="subway"](around:2000,{lat},{lng});
+              way["railway"="subway"](around:2000,{lat},{lng});
               node["railway"="station"]["station"="subway"](around:2000,{lat},{lng});
               way["railway"="station"]["station"="subway"](around:2000,{lat},{lng});
+              node["public_transport"="platform"]["train"!="yes"](around:2000,{lat},{lng});
               node["highway"="bus_stop"](around:2000,{lat},{lng});
+              node["public_transport"="stop_position"](around:2000,{lat},{lng});
               node["amenity"="hospital"](around:2000,{lat},{lng});
               way["amenity"="hospital"](around:2000,{lat},{lng});
               node["amenity"="school"](around:2000,{lat},{lng});
@@ -125,8 +129,9 @@ public sealed class OverpassPoiProvider : IDataProvider<PoiData>
             if (dist <= 2000) pois2km++;
 
             // Transit (subway or bus_stop)
-            var isTransit = (el.Tags.TryGetValue("railway", out var rw) && rw == "station") ||
-                            (el.Tags.TryGetValue("highway", out var hw) && hw == "bus_stop");
+            var isTransit = (el.Tags.TryGetValue("railway", out var rw) && rw is "station" or "subway") ||
+                            (el.Tags.TryGetValue("highway", out var hw) && hw == "bus_stop") ||
+                            (el.Tags.TryGetValue("public_transport", out var pt) && pt is "platform" or "stop_position");
             if (isTransit)
             {
                 if (dist <= 500) transitStops500m++;

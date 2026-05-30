@@ -70,7 +70,7 @@ public sealed class ViaCepProvider : IDataProvider<PropertyAddress>
             .ReadFromJsonAsync<ViaCepResponse>(_json, ct)
             .ConfigureAwait(false);
 
-        if (dto is null || dto.Erro)
+        if (dto is null || dto.Erro == "true")
             throw new ProviderException(ProviderName, $"CEP not found: {cep}");
 
         var cleanCep = dto.Cep?.Replace("-", "") ?? cep;

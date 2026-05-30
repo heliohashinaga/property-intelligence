@@ -85,9 +85,9 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
 
                 if (type is "HOSPITAL")
                     hospitalsWithin2km += count;
-                else if (type is "UBS" or "UPA" or "APS" or "CLINICA")
+                else if (type is "UBS" or "APS" or "CLINICA")  // UPA kept separate (emergency)
                     clinicsWithin2km += count;
-                else if (type is "EMERGENCIA" or "SAMU" or "UPA")
+                else if (type is "UPA" or "EMERGENCIA" or "SAMU")
                     emergencyUnits2km += count;
             }
 

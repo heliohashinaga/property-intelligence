@@ -10,5 +10,5 @@ internal sealed class ViaCepResponse
     public string? Localidade  { get; init; }
     public string? Uf          { get; init; }
     public string? Ibge        { get; init; }
-    public bool    Erro        { get; init; }
+    public string? Erro      { get; init; }  // API returns string "true", not bool
 }
