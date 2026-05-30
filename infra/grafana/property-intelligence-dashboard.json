@@ -1,0 +1,133 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Property Intelligence API — operational dashboard",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate (req/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(property_intelligence_analysis_duration_ms_count[5m]) * 60",
+          "legendFormat": "requests/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqpm", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "id": 2,
+      "title": "p95 Analysis Latency (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(property_intelligence_analysis_duration_ms_bucket[5m]))",
+          "legendFormat": "p95 latency"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(property_intelligence_analysis_duration_ms_bucket[5m]))",
+          "legendFormat": "p50 latency"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "thresholds": { "steps": [
+          { "color": "green", "value": null },
+          { "color": "yellow", "value": 4000 },
+          { "color": "red", "value": 8000 }
+        ]}}
+      }
+    },
+    {
+      "id": 3,
+      "title": "Provider Cache Hit Ratio",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(property_intelligence_provider_cache_hit_total{cached=\"true\"}[5m])) / sum(rate(property_intelligence_provider_cache_hit_total[5m]))",
+          "legendFormat": "cache hit ratio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "thresholds": { "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 0.5 },
+            { "color": "green", "value": 0.8 }
+          ]}
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Provider Fetch Duration by Provider (p95, ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(property_intelligence_provider_fetch_duration_ms_bucket[5m])))",
+          "legendFormat": "{{provider}} p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 5,
+      "title": "Composite Score Distribution by Grade",
+      "type": "histogram",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (grade) (increase(property_intelligence_score_composite_bucket[1h]))",
+          "legendFormat": "Grade {{grade}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 6,
+      "title": "OpenRouter Insight Generation Latency (p95, ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(property_intelligence_insight_generation_ms_bucket[5m]))",
+          "legendFormat": "insight p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(property_intelligence_insight_generation_ms_bucket[5m]))",
+          "legendFormat": "insight p50"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "thresholds": { "steps": [
+          { "color": "green", "value": null },
+          { "color": "yellow", "value": 5000 },
+          { "color": "red", "value": 10000 }
+        ]}}
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["property-intelligence", "api"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Property Intelligence",
+  "uid": "property-intelligence-v1",
+  "version": 1
+}

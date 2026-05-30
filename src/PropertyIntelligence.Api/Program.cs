@@ -283,6 +283,7 @@ if (!string.IsNullOrEmpty(otlpEndpoint))
         .WithMetrics(m =>
         {
             m.AddAspNetCoreInstrumentation();
+            m.AddMeter("PropertyIntelligence");   // AppTelemetry custom meters (T071)
             m.AddOtlpExporter(o =>
             {
                 o.Endpoint = new Uri(otlpEndpoint);

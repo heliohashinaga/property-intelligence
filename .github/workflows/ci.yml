@@ -84,3 +84,57 @@ jobs:
 
       - name: Integration tests
         run: dotnet test tests/PropertyIntelligence.Tests.Integration --no-build --configuration Release --verbosity normal
+
+  deploy:
+    name: Deploy to K3s Production
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify incident-response.md exists (T086 gate)
+        run: |
+          if [ ! -f docs/incident-response.md ]; then
+            echo "ERROR: docs/incident-response.md is required before production deploy."
+            echo "See T086 — create the LGPD incident response plan first."
+            exit 1
+          fi
+          echo "docs/incident-response.md found ✔"
+
+      - name: Verify data-inventory.md exists (T087 gate)
+        run: |
+          if [ ! -f docs/data-inventory.md ]; then
+            echo "ERROR: docs/data-inventory.md is required before production deploy."
+            echo "See T087 — create the LGPD data inventory first."
+            exit 1
+          fi
+          echo "docs/data-inventory.md found ✔"
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Deploy to K3s
+        run: |
+          kubectl set image deployment/property-intelligence-api \
+            api=ghcr.io/heliomarpm/property-intelligence-api:${{ github.sha }} \
+            -n property-intelligence
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/property-intelligence-api \
+            -n property-intelligence \
+            --timeout=300s
+
+      - name: Verify health endpoint
+        run: |
+          sleep 10
+          kubectl run health-check --rm -it --restart=Never \
+            --image=curlimages/curl:latest \
+            -n property-intelligence \
+            -- curl -sf http://property-intelligence-api/health && echo 'Health check passed ✔'

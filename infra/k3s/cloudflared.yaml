@@ -1,0 +1,44 @@
+---
+# Cloudflared DaemonSet — routes public traffic through Cloudflare Tunnel
+# Enforces TLS 1.2+ at the edge; origin (API) is not directly reachable.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cloudflared
+  namespace: property-intelligence
+spec:
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          args:
+            - tunnel
+            - --no-autoupdate
+            - run
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pi-secrets
+                  key: CLOUDFLARE_TUNNEL_TOKEN
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      terminationGracePeriodSeconds: 30

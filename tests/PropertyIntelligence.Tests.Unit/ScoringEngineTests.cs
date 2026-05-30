@@ -25,51 +25,73 @@ public sealed class ScoringEngineTests
     // ── Proportional composite (T041) ─────────────────────────────────────────
 
     [Fact]
-    public void Engine_OneUnavailableProvider_CompositMaxIs800()
+    public void Engine_OneUnavailableProvider_CompositeMaxIs1000()
     {
-        // 5 available × 200 = 1000 max; 1 unavailable → max must be 800
+        // 5 available × 200 = 1000 max; 1 unavailable → max must drop by 200
         var analysis = MakeAnalysisWithOneUnavailable(
             secScore: 120, mobScore: 150, infScore: 140,
             envScore: 100, appScore: 110);
 
-        analysis.CompositeMax.ShouldBe(800);
-        analysis.CompositeScore.ShouldBe(120 + 150 + 140 + 100 + 110); // 620
+        analysis.CompositeMax.ShouldBe(1000);  // 5 × 200
+        analysis.CompositeScore.ShouldBe(620); // 120+150+140+100+110
     }
 
     [Fact]
     public void Engine_OneUnavailableProvider_GradeUsesReducedDenominator()
     {
-        // 620 / 800 = 77.5% → B+ (70–79%)
+        // 620/1000 = 62% → B (60–69%)
         var analysis = MakeAnalysisWithOneUnavailable(
             secScore: 120, mobScore: 150, infScore: 140,
             envScore: 100, appScore: 110);
 
-        analysis.Grade.ShouldBe("B+");
+        analysis.Grade.ShouldBe("B");
     }
 
     [Fact]
-    public void Engine_AllProvidersAvailable_MaxIs1000()
+    public void Engine_FourUnavailableProviders_CompositeMaxIs400()
     {
+        // 2 available × 200 = 400 max
+        var dims = new List<DimensionScore>
+        {
+            DimensionScore.Available("security",       150, TrendDirection.Stable),
+            DimensionScore.Available("mobility",       170, TrendDirection.Stable),
+            DimensionScore.Unavailable("infrastructure"),
+            DimensionScore.Unavailable("environment"),
+            DimensionScore.Unavailable("appreciation"),
+            DimensionScore.Unavailable("urban_context"),
+        };
+        int composite = 150 + 170;
+        int max       = 2 * 200;
+        string grade  = ComputeGrade((double)composite / max); // 320/400 = 80% → A
+
+        grade.ShouldBe("A");
+        max.ShouldBe(400);
+    }
+
+    [Fact]
+    public void Engine_AllProvidersAvailable_MaxIs1200()
+    {
+        // 6 dimensions × 200 max each = 1200 composite max
         var analysis = MakeFullAnalysis(
             sec: 118, mob: 185, inf: 162, env: 95, app: 104, urb: 60);
 
-        analysis.CompositeMax.ShouldBe(1000);
+        analysis.CompositeMax.ShouldBe(1200);
         analysis.CompositeScore.ShouldBe(724);
     }
 
     [Fact]
     public void Engine_GradeBoundary_900Plus_IsAPlus()
     {
-        // 900/1000 = 90% → A+
-        var analysis = MakeFullAnalysis(sec: 180, mob: 180, inf: 160, env: 160, app: 130, urb: 90);
+        // 1080/1200 = 90% → A+
+        var analysis = MakeFullAnalysis(sec: 180, mob: 180, inf: 180, env: 180, app: 180, urb: 200);
         analysis.Grade.ShouldBe("A+");
     }
 
     [Fact]
     public void Engine_GradeBoundary_700Plus_IsBPlus()
     {
-        // 726/1000 = 72.6% → B+
-        var analysis = MakeFullAnalysis(sec: 120, mob: 180, inf: 150, env: 100, app: 100, urb: 76);
+        // 864/1200 = 72% → B+ (70–79%)
+        var analysis = MakeFullAnalysis(sec: 144, mob: 144, inf: 144, env: 144, app: 144, urb: 144);
         analysis.Grade.ShouldBe("B+");
     }
 

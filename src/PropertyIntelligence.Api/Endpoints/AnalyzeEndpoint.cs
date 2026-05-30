@@ -127,6 +127,7 @@ public static partial class AnalyzeEndpoint
             LlmModel           = ctx.RequestServices
                                     .GetService<IConfiguration>()
                                     ?["LLM_MODEL"] ?? "unknown",
+            Cached             = !forceRefresh && analysis.Cached,
         };
 
         // ── 7. Persist property_analyses (append-only) ────────────────────────
@@ -136,6 +137,12 @@ public static partial class AnalyzeEndpoint
         LogAnalysisComplete(logger,
             correlationId, AddressLogEnricher.Hash(address.NormalizedAddress),
             analysis.CompositeScore, analysis.CompositeMax, analysis.Grade, sw.ElapsedMilliseconds);
+
+        // ── OpenTelemetry metrics (T071) ──────────────────────────────────────────
+        AppTelemetry.AnalysisDuration.Record(sw.ElapsedMilliseconds);
+        AppTelemetry.ScoreComposite.Record(
+            analysis.CompositeScore,
+            new KeyValuePair<string, object?>("grade", analysis.Grade));
 
         // ── 8. Build response ─────────────────────────────────────────────────
         return Results.Ok(BuildResponse(address, analysis));

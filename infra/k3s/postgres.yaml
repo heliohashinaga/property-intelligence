@@ -1,0 +1,86 @@
+---
+# PostgreSQL + PostGIS StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: property-intelligence
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      initContainers:
+        - name: run-migrations
+          image: postgis/postgis:16-3.4
+          command: ["sh", "-c", "until pg_isready -h localhost; do sleep 2; done && psql $DATABASE_URL < /migrations/run.sh || true"]
+          envFrom:
+            - secretRef:
+                name: pi-secrets
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      containers:
+        - name: postgres
+          image: postgis/postgis:16-3.4
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: property_intelligence
+            - name: POSTGRES_DB
+              value: property_intelligence
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pi-secrets
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "property_intelligence"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: migrations
+          configMap:
+            name: migrations-scripts
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 20Gi
+
+---
+# PostgreSQL Service (ClusterIP — internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: property-intelligence
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
