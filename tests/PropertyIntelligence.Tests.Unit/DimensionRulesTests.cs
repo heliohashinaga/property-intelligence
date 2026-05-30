@@ -293,7 +293,7 @@ public sealed class DimensionRulesTests
         var profile = new PropertyProfile
         {
             Address = MakeAddress(),
-            IptuData = new PropertyTaxData { ValorVenal = 950_000m, ZoningClass = "ZM-3a" },
+            IptuData = new IptuData { ValorVenal = 950_000m, ZoningClass = "ZM-3a" },
             ProvidersUnavailable = []
         };
 

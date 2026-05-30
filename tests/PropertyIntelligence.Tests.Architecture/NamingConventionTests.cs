@@ -56,7 +56,8 @@ public class NamingConventionTests
     public void DomainClasses_Must_LiveIn_DomainNamespace() =>
         Types.InAssembly(Assemblies.Core)
              .That().ResideInNamespace("PropertyIntelligence.Core.Domain")
-             .Should().NotHaveNameStartingWith("I")   // no interfaces in the Domain namespace
+             .And().AreInterfaces()
+             .Should().NotResideInNamespace("PropertyIntelligence.Core.Domain")  // interfaces belong in Core.Interfaces
              .GetResult()
              .ShouldPassWith("interfaces belong in Core.Interfaces, not Core.Domain");
 

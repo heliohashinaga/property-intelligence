@@ -5,7 +5,7 @@ namespace PropertyIntelligence.Rules.Dimensions;
 
 // ── Appreciation dimension rules ──────────────────────────────────────────────
 // Additive (capped at 200 by the engine).
-// MVP: PropertyTaxData has ValorVenal and ZoningClass (no historical time series).
+// MVP: IptuData has ValorVenal and ZoningClass (no historical time series).
 // Full CAGR trend analysis deferred to Phase 4 (US2).
 
 public sealed class AppreciationNoIptuDataRule : Rule

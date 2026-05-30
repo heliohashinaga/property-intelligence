@@ -97,7 +97,7 @@ public sealed record SchoolData
 }
 
 /// <summary>IPTU API — property valuation and zoning data.</summary>
-public sealed record PropertyTaxData
+public sealed record IptuData
 {
     /// <summary>Most recent IPTU assessed value (valor venal) in BRL. Null if unavailable.</summary>
     public decimal? ValorVenal         { get; init; }
@@ -126,7 +126,7 @@ public sealed record PropertyProfile
     public CrimeData?    CrimeData    { get; init; }
     public HealthData?   HealthData   { get; init; }
     public SchoolData?   SchoolData   { get; init; }
-    public PropertyTaxData? IptuData     { get; init; }
+    public IptuData? IptuData     { get; init; }
 
     /// <summary>Provider names that failed or timed out during enrichment.</summary>
     public required IReadOnlyList<string> ProvidersUnavailable { get; init; }

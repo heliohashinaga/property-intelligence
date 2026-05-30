@@ -20,7 +20,7 @@ public sealed class PropertyEnrichmentModule
     private readonly IDataProvider<CrimeData>       _crime;
     private readonly IDataProvider<HealthData>      _cnes;
     private readonly IDataProvider<SchoolData>      _inep;
-    private readonly IDataProvider<PropertyTaxData> _iptu;
+    private readonly IDataProvider<IptuData> _iptu;
     private readonly ILogger<PropertyEnrichmentModule> _logger;
 
     public PropertyEnrichmentModule(
@@ -30,7 +30,7 @@ public sealed class PropertyEnrichmentModule
         IDataProvider<CrimeData>       crime,
         IDataProvider<HealthData>      cnes,
         IDataProvider<SchoolData>      inep,
-        IDataProvider<PropertyTaxData> iptu,
+        IDataProvider<IptuData> iptu,
         ILogger<PropertyEnrichmentModule> logger)
     {
         _overpass = overpass;

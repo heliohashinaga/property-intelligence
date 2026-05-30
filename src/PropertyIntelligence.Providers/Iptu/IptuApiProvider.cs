@@ -11,9 +11,9 @@ namespace PropertyIntelligence.Providers.Iptu;
 /// <summary>
 /// Fetches IPTU (property tax) assessment data from iptuapi.com.br.
 /// Returns <c>null</c> gracefully on 404 or error — IPTU data is best-effort.
-/// Implements <see cref="IDataProvider{PropertyTaxData}"/>.
+/// Implements <see cref="IDataProvider{IptuData}"/>.
 /// </summary>
-public sealed class IptuApiProvider : IDataProvider<PropertyTaxData?>
+public sealed class IptuApiProvider : IDataProvider<IptuData?>
 {
     public string   ProviderName => "iptu_api";
     public TimeSpan CacheTtl     => TimeSpan.FromDays(30);
@@ -42,10 +42,10 @@ public sealed class IptuApiProvider : IDataProvider<PropertyTaxData?>
     }
 
     /// <inheritdoc/>
-    public async Task<PropertyTaxData?> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+    public async Task<IptuData?> FetchAsync(PropertyAddress address, CancellationToken ct = default)
     {
         var cacheKey = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
-        var cached   = await _cache.GetAsync<PropertyTaxData>(cacheKey, ct).ConfigureAwait(false);
+        var cached   = await _cache.GetAsync<IptuData>(cacheKey, ct).ConfigureAwait(false);
         if (cached is not null)
             return cached;
 
@@ -58,7 +58,7 @@ public sealed class IptuApiProvider : IDataProvider<PropertyTaxData?>
 
     // ── private ──────────────────────────────────────────────────────────────
 
-    private async Task<PropertyTaxData?> FetchFromApiAsync(PropertyAddress address, CancellationToken ct)
+    private async Task<IptuData?> FetchFromApiAsync(PropertyAddress address, CancellationToken ct)
     {
         try
         {
@@ -82,7 +82,7 @@ public sealed class IptuApiProvider : IDataProvider<PropertyTaxData?>
 
             if (dto is null) return null;
 
-            return new PropertyTaxData
+            return new IptuData
             {
                 ValorVenal = dto.ValorVenal,
                 ZoningClass = dto.Zoneamento,

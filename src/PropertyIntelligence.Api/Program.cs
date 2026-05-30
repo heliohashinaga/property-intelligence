@@ -89,7 +89,7 @@ builder.Services.AddScoped<IDataProvider<CensusData>, IbgeCensusProvider>();
 builder.Services.AddScoped<IDataProvider<CrimeData>, CrimeDataProvider>();
 builder.Services.AddScoped<IDataProvider<HealthData>, CnesHealthProvider>();
 builder.Services.AddScoped<IDataProvider<SchoolData>, InepSchoolProvider>();
-builder.Services.AddScoped<IDataProvider<PropertyTaxData>, IptuApiProvider>();
+builder.Services.AddScoped<IDataProvider<IptuData>, IptuApiProvider>();
 builder.Services.AddScoped<PropertyEnrichmentModule>();
 
 // NRules engine (T027-T034)
