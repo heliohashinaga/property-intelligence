@@ -45,13 +45,32 @@ public sealed partial class OverpassPoiProvider : IDataProvider<PoiData>
             return new PoiData();
         }
 
-        var cacheKey = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
-        var cached   = await _cache.GetAsync<PoiData>(cacheKey, ct).ConfigureAwait(false);
+        var cacheKey     = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var snapshotKey  = $"{cacheKey}:transit_snapshot";
+
+        var cached = await _cache.GetAsync<PoiData>(cacheKey, ct).ConfigureAwait(false);
         if (cached is not null)
             return cached;
 
+        // Load the prior transit-stop snapshot for trend comparison (T079)
+        var priorSnapshot = await _cache.GetAsync<TransitSnapshot>(snapshotKey, ct)
+            .ConfigureAwait(false);
+
         var result = await FetchFromOverpassAsync(address.Lat.Value, address.Lng.Value, ct)
             .ConfigureAwait(false);
+
+        // Compute 24-month mobility trend from snapshot delta
+        var mobilityTrend = TrendCalculator.SnapshotDelta(
+            prior:     priorSnapshot?.TransitStops1km,
+            current:   result.TransitStops1km,
+            tolerance: 2);
+
+        result = result with { MobilityTrend = mobilityTrend };
+
+        // Store new snapshot for future trend calculation (TTL matches cache TTL)
+        await _cache.SetAsync(snapshotKey,
+            new TransitSnapshot(result.TransitStops1km, DateTimeOffset.UtcNow),
+            CacheTtl, ct).ConfigureAwait(false);
 
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct).ConfigureAwait(false);
         return result;
@@ -115,6 +134,7 @@ public sealed partial class OverpassPoiProvider : IDataProvider<PoiData>
         int supermarkets1km = 0;
         int pharmacies1km = 0;
         int parks1km = 0;
+        bool hasFutureMetro = false;
 
         foreach (var el in elements)
         {
@@ -137,6 +157,12 @@ public sealed partial class OverpassPoiProvider : IDataProvider<PoiData>
                 if (dist <= 1000) transitStops1km++;
             }
 
+            // T047 — future metro station within 1km (construction=station tag)
+            if (dist <= 1000 &&
+                el.Tags.TryGetValue("construction", out var construction) &&
+                construction == "station")
+                hasFutureMetro = true;
+
             // Supermarkets within 1km
             if (el.Tags.TryGetValue("amenity", out var amenity) && amenity == "supermarket" && dist <= 1000)
                 supermarkets1km++;
@@ -158,6 +184,7 @@ public sealed partial class OverpassPoiProvider : IDataProvider<PoiData>
             Supermarkets1km  = supermarkets1km,
             Pharmacies1km    = pharmacies1km,
             Parks1km         = parks1km,
+            HasFutureMetro   = hasFutureMetro,
         };
     }
 
@@ -179,3 +206,8 @@ public sealed partial class OverpassPoiProvider : IDataProvider<PoiData>
         Message = "OverpassPoiProvider: coordinates missing for '{Address}'; returning empty PoiData")]
     private static partial void LogNoCoordinates(ILogger logger, string address);
 }
+
+/// <summary>Serialised snapshot of transit-stop count stored in Redis for mobility trend calculation.</summary>
+internal sealed record TransitSnapshot(
+    int              TransitStops1km,
+    DateTimeOffset   StoredAt);

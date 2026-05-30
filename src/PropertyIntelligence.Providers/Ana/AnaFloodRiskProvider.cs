@@ -74,7 +74,13 @@ public sealed partial class AnaFloodRiskProvider : IDataProvider<FloodRiskData>
             var scalar = await cmd.ExecuteScalarAsync(ct);
             var riskLevel = scalar is DBNull or null ? null : (string?)scalar;
 
-            result = new FloodRiskData { RiskLevel = riskLevel };
+            result = new FloodRiskData
+            {
+                RiskLevel = riskLevel,
+                // TODO: derive Trend from flood_risk_zones import history once 2nd snapshot available (T044/US2)
+                // For now, environment trend is always Stable (ANA data updates rarely).
+                Trend = TrendDirection.Stable,
+            };
         }
         catch (Exception ex)
         {

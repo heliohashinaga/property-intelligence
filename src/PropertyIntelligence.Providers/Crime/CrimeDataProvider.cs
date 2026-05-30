@@ -10,7 +10,7 @@ namespace PropertyIntelligence.Providers.Crime;
 
 /// <summary>
 /// Queries the local <c>crime_records</c> table (SSP-SP CSV import).
-/// Returns crime rate per 100 k residents for a rolling 2-year window.
+/// Returns crime rate per 100 k residents and 24-month trend direction.
 /// </summary>
 public sealed partial class CrimeDataProvider : IDataProvider<CrimeData>
 {
@@ -43,7 +43,8 @@ public sealed partial class CrimeDataProvider : IDataProvider<CrimeData>
         if (cached is not null)
             return cached;
 
-        var cutoffYear = DateTimeOffset.UtcNow.Year - 2;
+        var now        = DateTimeOffset.UtcNow;
+        var cutoffYear = now.Year - 2;
         var city       = address.City;
 
         CrimeData result;
@@ -53,28 +54,54 @@ public sealed partial class CrimeDataProvider : IDataProvider<CrimeData>
             await using var conn = (NpgsqlConnection)ctx.Database.GetDbConnection();
             await conn.OpenAsync(ct);
 
-            // Aggregate total crimes across all types for the rolling window
-            const string sql = """
+            // ── 1. Current rate: total crimes over 24-month window ────────────
+            const string totalSql = """
                 SELECT COALESCE(SUM(count), 0)::bigint AS total_crimes
                 FROM   crime_records
                 WHERE  municipality = @city
                   AND  year >= @cutoffYear
                 """;
 
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("city",       city);
-            cmd.Parameters.AddWithValue("cutoffYear", cutoffYear);
+            await using var totalCmd = new NpgsqlCommand(totalSql, conn);
+            totalCmd.Parameters.AddWithValue("city",       city);
+            totalCmd.Parameters.AddWithValue("cutoffYear", cutoffYear);
 
-            var scalar      = await cmd.ExecuteScalarAsync(ct);
+            var scalar      = await totalCmd.ExecuteScalarAsync(ct);
             var totalCrimes = scalar is DBNull or null ? 0L : Convert.ToInt64(scalar);
+            var per100k     = Math.Round(totalCrimes / (FallbackPopulation / 100_000.0), 2);
 
-            // Crime rate per 100 k using fallback population
-            var per100k = totalCrimes / (FallbackPopulation / 100_000.0);
+            // ── 2. Trend: per_100k grouped by month over last 24 months ───────
+            // Returns rows: (year, month, total_crimes) ordered oldest → newest
+            const string trendSql = """
+                SELECT   year, month, SUM(count)::double precision AS monthly_crimes
+                FROM     crime_records
+                WHERE    municipality = @city
+                  AND    (year > @cutoffYear OR (year = @cutoffYear AND month >= @cutoffMonth))
+                GROUP BY year, month
+                ORDER BY year, month
+                """;
+
+            await using var trendCmd = new NpgsqlCommand(trendSql, conn);
+            trendCmd.Parameters.AddWithValue("city",        city);
+            trendCmd.Parameters.AddWithValue("cutoffYear",  cutoffYear);
+            trendCmd.Parameters.AddWithValue("cutoffMonth", now.Month);
+
+            var monthlyRates = new List<double>();
+            await using var reader = await trendCmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var monthlyCrimes = reader.GetDouble(2);
+                // Normalise to per-100k for a comparable series
+                monthlyRates.Add(monthlyCrimes / (FallbackPopulation / 100_000.0));
+            }
+
+            var securityTrend = TrendCalculator.LinearSlope(monthlyRates);
 
             result = new CrimeData
             {
-                CrimeRatePer100k = Math.Round(per100k, 2),
-                YoyChangePct     = null,  // Populated in Phase 4 (US2)
+                CrimeRatePer100k = per100k,
+                YoyChangePct     = null,   // retained for backwards compat
+                SecurityTrend    = securityTrend,
             };
         }
         catch (Exception ex)

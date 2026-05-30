@@ -33,7 +33,8 @@ public sealed partial class IbgeCensusProvider : IDataProvider<CensusData>
 
     public async Task<CensusData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
     {
-        var cacheKey = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var cacheKey    = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var snapshotKey = $"{cacheKey}:urban_snapshot";
 
         var cached = await _cache.GetAsync<CensusData>(cacheKey, ct);
         if (cached is not null)
@@ -87,6 +88,18 @@ public sealed partial class IbgeCensusProvider : IDataProvider<CensusData>
             return new CensusData();
         }
 
+        // Compute 36-month urban context trend from income group snapshot delta (T081)
+        var priorSnapshot  = await _cache.GetAsync<UrbanSnapshot>(snapshotKey, ct);
+        var urbanTrend     = TrendCalculator.SnapshotDelta(
+            prior:     priorSnapshot?.MedianIncomeGroup,
+            current:   result.MedianIncomeGroup ?? 0,
+            tolerance: 0);  // Any change in income group = signal
+
+        result = result with { UrbanContextTrend = urbanTrend };
+
+        await _cache.SetAsync(snapshotKey,
+            new UrbanSnapshot(result.MedianIncomeGroup ?? 0, DateTimeOffset.UtcNow),
+            CacheTtl, ct);
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
@@ -100,3 +113,6 @@ public sealed partial class IbgeCensusProvider : IDataProvider<CensusData>
         Message = "IbgeCensusProvider: PostGIS query failed for {Address}")]
     private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }
+
+/// <summary>Snapshot of median income group stored in Redis for urban context trend calculation.</summary>
+internal sealed record UrbanSnapshot(int MedianIncomeGroup, DateTimeOffset StoredAt);

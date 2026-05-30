@@ -24,13 +24,28 @@ public sealed record AnalysisWarning
 
     // ── Factory helpers ──────────────────────────────────────────────────────
 
-    public static AnalysisWarning ProviderUnavailable(string providerName, string dimension) =>
-        new()
+    private static readonly IReadOnlyDictionary<string, string> _dimensionPtBr =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["security"]       = "segurança",
+            ["mobility"]       = "mobilidade",
+            ["infrastructure"] = "infraestrutura",
+            ["environment"]    = "ambiente",
+            ["appreciation"]   = "valorização",
+            ["urban_context"]  = "contexto urbano",
+        };
+
+    /// <summary>T048 — PT-BR warning when a provider is unavailable.</summary>
+    public static AnalysisWarning ProviderUnavailable(string providerName, string dimension)
+    {
+        var dimPtBr = _dimensionPtBr.GetValueOrDefault(dimension, dimension);
+        return new()
         {
             Code      = "provider_unavailable",
-            Message   = $"Data from '{providerName}' is currently unavailable. The '{dimension}' dimension was excluded from the score.",
-            Dimension = dimension
+            Message   = $"A análise de {dimPtBr} não pôde ser realizada por indisponibilidade temporária dos dados ({providerName}).",
+            Dimension = dimension,
         };
+    }
 
     public static AnalysisWarning InsightUnavailable() =>
         new()

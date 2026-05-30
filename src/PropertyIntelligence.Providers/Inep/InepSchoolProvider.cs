@@ -33,7 +33,8 @@ public sealed partial class InepSchoolProvider : IDataProvider<SchoolData>
 
     public async Task<SchoolData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
     {
-        var cacheKey = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var cacheKey    = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var snapshotKey = $"{cacheKey}:infra_snapshot";
 
         var cached = await _cache.GetAsync<SchoolData>(cacheKey, ct);
         if (cached is not null)
@@ -107,6 +108,18 @@ public sealed partial class InepSchoolProvider : IDataProvider<SchoolData>
             return new SchoolData();
         }
 
+        // Compute 36-month infrastructure trend from snapshot delta (T080)
+        var priorSnapshot  = await _cache.GetAsync<SchoolSnapshot>(snapshotKey, ct);
+        var infraTrend     = TrendCalculator.SnapshotDelta(
+            prior:     priorSnapshot?.SchoolsWithin2km,
+            current:   result.SchoolsWithin2km,
+            tolerance: 1);
+
+        result = result with { InfrastructureTrend = infraTrend };
+
+        await _cache.SetAsync(snapshotKey,
+            new SchoolSnapshot(result.SchoolsWithin2km, DateTimeOffset.UtcNow),
+            CacheTtl, ct);
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
@@ -120,3 +133,6 @@ public sealed partial class InepSchoolProvider : IDataProvider<SchoolData>
         Message = "InepSchoolProvider: PostGIS query failed for {Address}")]
     private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }
+
+/// <summary>Snapshot of school count stored in Redis for infrastructure trend calculation.</summary>
+internal sealed record SchoolSnapshot(int SchoolsWithin2km, DateTimeOffset StoredAt);

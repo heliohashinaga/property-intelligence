@@ -92,9 +92,9 @@ public sealed partial class IptuApiProvider : IDataProvider<IptuData?>
 
             return new IptuData
             {
-                ValorVenal  = dto.ValorVenal,
-                ZoningClass = dto.Zoneamento,
-                // AppreciationTrend populated in US2 (Phase 4)
+                ValorVenal        = dto.ValorVenal,
+                ZoningClass       = dto.Zoneamento,
+                AppreciationTrend = ComputeAppreciationTrend(dto.Historico),
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -102,6 +102,25 @@ public sealed partial class IptuApiProvider : IDataProvider<IptuData?>
             LogFetchFailed(_logger, ex, address.NormalizedAddress);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Computes appreciation trend from IPTU historical valor_venal entries (T043).
+    /// Uses CAGR over up to 36 months; returns InsufficientData when fewer than 3 entries.
+    /// </summary>
+    private static TrendDirection? ComputeAppreciationTrend(
+        IReadOnlyList<IptuHistoricalEntry> history)
+    {
+        if (history.Count < 3)
+            return TrendDirection.InsufficientData;
+
+        // Map API entries to (Year, Value) pairs for TrendCalculator
+        var pairs = history
+            .Select(h => (h.Year, h.ValorVenal))
+            .OrderBy(p => p.Year)
+            .ToList();
+
+        return TrendCalculator.Cagr(pairs);
     }
 
     private static string BuildQuery(PropertyAddress address)

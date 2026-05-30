@@ -33,6 +33,8 @@ public sealed record PoiData
     public int Pharmacies1km     { get; init; }
     /// <summary>Parks / green areas within 1 km.</summary>
     public int Parks1km          { get; init; }
+    /// <summary>Whether a future metro station (construction=station) is within 1 km. Populated in US2 (Phase 4).</summary>
+    public bool HasFutureMetro   { get; init; }
     /// <summary>Trend direction populated in US2 (Phase 4). Null at MVP.</summary>
     public TrendDirection? MobilityTrend { get; init; }
 }

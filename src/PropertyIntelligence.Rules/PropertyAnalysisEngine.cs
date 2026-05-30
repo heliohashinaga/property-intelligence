@@ -71,7 +71,8 @@ public sealed class PropertyAnalysisEngine : IPropertyAnalysisEngine
                 return DimensionScore.Unavailable(dim);
 
             var total = Math.Min(200, facts.Sum(f => f.Points));
-            var trend = ResolveTrend(facts);
+            // T045: use provider-sourced trend from PropertyProfile
+            var trend = ResolveProviderTrend(dim, profile);
             return DimensionScore.Available(dim, total, trend);
         }).ToList();
 
@@ -121,9 +122,34 @@ public sealed class PropertyAnalysisEngine : IPropertyAnalysisEngine
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>T045 — resolves trend for a dimension from provider-sourced data in the PropertyProfile.</summary>
+    private static TrendDirection ResolveProviderTrend(string dimension, PropertyProfile profile) =>
+        dimension switch
+        {
+            "security"       => profile.CrimeData?.SecurityTrend      ?? TrendDirection.InsufficientData,
+            "mobility"       => profile.PoiData?.MobilityTrend         ?? TrendDirection.InsufficientData,
+            "infrastructure" => ResolveInfrastructureTrend(profile),
+            "environment"    => profile.FloodRisk?.Trend               ?? TrendDirection.Stable,
+            "appreciation"   => profile.IptuData?.AppreciationTrend    ?? TrendDirection.InsufficientData,
+            "urban_context"  => profile.CensusData?.UrbanContextTrend  ?? TrendDirection.InsufficientData,
+            _                => TrendDirection.InsufficientData,
+        };
+
+    private static TrendDirection ResolveInfrastructureTrend(PropertyProfile profile)
+    {
+        var healthTrend = profile.HealthData?.InfrastructureTrend;
+        var schoolTrend = profile.SchoolData?.InfrastructureTrend;
+        if (healthTrend is null && schoolTrend is null) return TrendDirection.InsufficientData;
+        var trends = new[] { healthTrend, schoolTrend }.OfType<TrendDirection>().ToList();
+        if (trends.Any(t => t == TrendDirection.Worsening))        return TrendDirection.Worsening;
+        if (trends.Any(t => t == TrendDirection.Improving))        return TrendDirection.Improving;
+        if (trends.Any(t => t == TrendDirection.InsufficientData)) return TrendDirection.InsufficientData;
+        return TrendDirection.Stable;
+    }
+
+    /// <summary>Kept for ScoringFact-based trend strings emitted by NRules (legacy path).</summary>
     private static TrendDirection ResolveTrend(IReadOnlyList<ScoringFact> facts)
     {
-        // Pessimistic: if any rule says worsening, propagate it.
         if (facts.Any(f => f.Trend == "worsening")) return TrendDirection.Worsening;
         if (facts.Any(f => f.Trend == "improving")) return TrendDirection.Improving;
         return TrendDirection.Stable;
@@ -165,17 +191,22 @@ public sealed class PropertyAnalysisEngine : IPropertyAnalysisEngine
         if (profile.FloodRisk?.RiskLevel is "high")      flags.Add("high_flood_risk");
         if (profile.FloodRisk?.RiskLevel is "critical")  flags.Add("critical_flood_risk");
 
-        if (profile.CrimeData?.YoyChangePct > 5)         flags.Add("crime_trend_12m");
+        // T046 — crime trend worsening (uses provider SecurityTrend, not YoY%)
+        if (profile.CrimeData?.SecurityTrend == TrendDirection.Worsening)
+            flags.Add("crime_trend_12m");
 
+        // T046 — high crime area (score-based fallback)
         var secScore = scores.FirstOrDefault(d => d.Dimension == "security");
-        if (secScore?.Score < 60)                        flags.Add("high_crime_area");
+        if (secScore?.Score < 60) flags.Add("high_crime_area");
 
+        // T046 — low mobility: score < 80 per task spec
         var mobScore = scores.FirstOrDefault(d => d.Dimension == "mobility");
-        if (mobScore?.Status == DimensionStatus.Available && mobScore.Score < 40)
-                                                          flags.Add("low_mobility");
+        if (mobScore?.Status == DimensionStatus.Available && mobScore.Score < 80)
+            flags.Add("low_mobility");
 
-        var infScore = scores.FirstOrDefault(d => d.Dimension == "infrastructure");
-        if (profile.HealthData?.HospitalsWithin2km == 0) flags.Add("no_hospital_2km");
+        // T046 — no hospital within 2km
+        if (profile.HealthData?.HospitalsWithin2km == 0)
+            flags.Add("no_hospital_2km");
 
         return flags;
     }
@@ -184,13 +215,21 @@ public sealed class PropertyAnalysisEngine : IPropertyAnalysisEngine
     {
         var flags = new List<string>();
 
-        // Zoning upside
-        if (profile.IptuData?.ZoningClass is "ZEU" or "ZOE" or "ZC")
+        // T047 — future metro station within 1km (Overpass construction=station tag)
+        if (profile.PoiData is { HasFutureMetro: true })
+            flags.Add("metro_expansion_nearby");
+
+        // T047 — zoning allows high density
+        if (profile.IptuData?.ZoningClass is "ZEU" or "ZOE" or "ZC" or "ZM")
             flags.Add("zoning_upscale");
 
-        // Quality school nearby
-        if (profile.SchoolData?.NearestSchoolIdeb >= 8.0)
-            flags.Add("school_excellence_nearby");
+        // T047 — appreciation trend improving
+        if (profile.IptuData?.AppreciationTrend == TrendDirection.Improving)
+            flags.Add("appreciation_trend_up");
+
+        // T047 — school excellence within 1km (IDEB >= 7.0)
+        if (profile.SchoolData?.NearestSchoolIdeb >= 7.0)
+            flags.Add("school_excellence_1km");
 
         return flags;
     }

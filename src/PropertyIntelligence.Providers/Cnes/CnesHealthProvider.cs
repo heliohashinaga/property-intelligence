@@ -33,7 +33,8 @@ public sealed partial class CnesHealthProvider : IDataProvider<HealthData>
 
     public async Task<HealthData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
     {
-        var cacheKey = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var cacheKey    = CacheKeyHelper.BuildKey(ProviderName, address.NormalizedAddress);
+        var snapshotKey = $"{cacheKey}:infra_snapshot";
 
         var cached = await _cache.GetAsync<HealthData>(cacheKey, ct);
         if (cached is not null)
@@ -104,6 +105,19 @@ public sealed partial class CnesHealthProvider : IDataProvider<HealthData>
             return new HealthData();
         }
 
+        // Compute 36-month infrastructure trend from snapshot delta (T080)
+        var priorSnapshot    = await _cache.GetAsync<InfraSnapshot>(snapshotKey, ct);
+        var totalFacilities  = result.HospitalsWithin2km + result.ClinicsWith2km + result.EmergencyUnits2km;
+        var infraTrend       = TrendCalculator.SnapshotDelta(
+            prior:     priorSnapshot?.TotalFacilities,
+            current:   totalFacilities,
+            tolerance: 1);
+
+        result = result with { InfrastructureTrend = infraTrend };
+
+        await _cache.SetAsync(snapshotKey,
+            new InfraSnapshot(totalFacilities, DateTimeOffset.UtcNow),
+            CacheTtl, ct);
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
@@ -117,3 +131,6 @@ public sealed partial class CnesHealthProvider : IDataProvider<HealthData>
         Message = "CnesHealthProvider: PostGIS query failed for {Address}")]
     private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }
+
+/// <summary>Snapshot of total infrastructure facility count stored in Redis for trend calculation.</summary>
+internal sealed record InfraSnapshot(int TotalFacilities, DateTimeOffset StoredAt);
