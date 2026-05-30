@@ -22,7 +22,6 @@ public static partial class AnalyzeEndpoint
         app.MapPost("/v1/property/analyze", HandleAsync)
            .RequireAuthorization()
            .WithName("AnalyzeProperty")
-           .WithOpenApi()
            .WithSummary("Analyze a Brazilian property address")
            .WithDescription("Scores a property across 6 dimensions (security, mobility, infrastructure, environment, appreciation, urban_context) using public data sources and generates a PT-BR AI insight.")
            .Produces(200)

@@ -24,6 +24,7 @@
     <ProjectReference Include="..\PropertyIntelligence.Providers\PropertyIntelligence.Providers.csproj" />
     <ProjectReference Include="..\PropertyIntelligence.Rules\PropertyIntelligence.Rules.csproj" />
     <ProjectReference Include="..\PropertyIntelligence.Explainability\PropertyIntelligence.Explainability.csproj" />
+    <ProjectReference Include="..\PropertyIntelligence.Dispatcher\PropertyIntelligence.Dispatcher.csproj" />
   </ItemGroup>
 
 </Project>
