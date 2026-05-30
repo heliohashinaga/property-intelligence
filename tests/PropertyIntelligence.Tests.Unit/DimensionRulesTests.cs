@@ -1,4 +1,4 @@
-using NSubstitute;
+using Moq;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 using Shouldly;
@@ -10,7 +10,7 @@ namespace PropertyIntelligence.Tests.Unit;
 /// Tests are written against the IPropertyAnalysisEngine interface contract.
 ///
 /// RED PHASE: Tests are skipped until T027–T034 (NRules Facts + Dimensions + Engine) are complete.
-/// To activate: remove the Skip attribute and replace the NSubstitute mock with the real
+/// To activate: remove the Skip attribute and replace the Moq mock with the real
 /// PropertyAnalysisEngine implementation.
 ///
 /// Scoring thresholds (from tasks.md T028–T033):
@@ -56,22 +56,22 @@ public sealed class DimensionRulesTests
 
         return new PropertyAnalysis
         {
-            AddressId      = Guid.NewGuid(),
-            ApiConsumerId  = Guid.NewGuid(),
-            CompositeScore = composite,
-            CompositeMax   = max,
-            Grade          = "B",
+            AddressId            = Guid.NewGuid(),
+            ApiConsumerId        = Guid.NewGuid(),
+            CompositeScore       = composite,
+            CompositeMax         = max,
+            Grade                = "B",
             DimensionScores      = dims,
-            Warnings       = [],
-            RiskFlags      = [],
-            OpportunityFlags = [],
-            Insight        = null,
-            InsightUnavailable = false,
-            ProvidersUsed  = ["viacep", "overpass", "ssp_sp", "ana_snirh", "ibge_census", "cnes", "inep", "iptu_api"],
+            Warnings             = [],
+            RiskFlags            = [],
+            OpportunityFlags     = [],
+            Insight              = null,
+            InsightUnavailable   = false,
+            ProvidersUsed        = ["viacep", "overpass", "ssp_sp", "ana_snirh", "ibge_census", "cnes", "inep", "iptu_api"],
             ProvidersUnavailable = [],
-            LlmModel       = "test",
-            RulesVersion   = "1.0.0",
-            RequestIp      = null,
+            LlmModel             = "test",
+            RulesVersion         = "1.0.0",
+            RequestIp            = null,
             // CreatedAt defaults to DateTimeOffset.UtcNow
         };
     }
@@ -89,16 +89,17 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.CrimeData!.CrimeRatePer100k < 50),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(security: 180));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.CrimeData!.CrimeRatePer100k < 50),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(security: 180));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "security");
         dim.Status.ShouldBe(DimensionStatus.Available);
-        dim.Score.ShouldNotBeNull();
         dim.Score.ShouldNotBeNull();
         dim.Score!.Value.ShouldBeGreaterThanOrEqualTo(160);
     }
@@ -114,15 +115,16 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.CrimeData!.CrimeRatePer100k > 300),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(security: 20));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.CrimeData!.CrimeRatePer100k > 300),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(security: 20));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "security");
-        dim.Score.ShouldNotBeNull();
         dim.Score.ShouldNotBeNull();
         dim.Score!.Value.ShouldBeLessThanOrEqualTo(40);
     }
@@ -137,12 +139,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = ["ssp_sp"]
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.CrimeData == null),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(securityUnavailable: true));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.CrimeData == null),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(securityUnavailable: true));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "security");
         dim.Status.ShouldBe(DimensionStatus.Unavailable);
@@ -154,7 +158,7 @@ public sealed class DimensionRulesTests
     [Fact(Skip = "Red phase — MobilityRules not implemented yet (T029)")]
     public void Mobility_MetroNearby_ScoresHigh()
     {
-        // TransitStops500m >= 1 (metro station) → mobility score MUST be >= 150
+        // TransitStops500m >= 1 → mobility score MUST be >= 150
         var profile = new PropertyProfile
         {
             Address = MakeAddress(),
@@ -162,12 +166,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.PoiData!.TransitStops500m >= 1),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(mobility: 185));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.PoiData!.TransitStops500m >= 1),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(mobility: 185));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "mobility");
         dim.Score.ShouldNotBeNull();
@@ -185,12 +191,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.PoiData!.TransitStops1km == 0),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(mobility: 30));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.PoiData!.TransitStops1km == 0),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(mobility: 30));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "mobility");
         dim.Score.ShouldNotBeNull();
@@ -210,12 +218,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.HealthData!.HospitalsWithin2km >= 1),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(infrastructure: 140));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.HealthData!.HospitalsWithin2km >= 1),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(infrastructure: 140));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "infrastructure");
         dim.Score.ShouldNotBeNull();
@@ -227,7 +237,7 @@ public sealed class DimensionRulesTests
     [Fact(Skip = "Red phase — EnvironmentRules not implemented yet (T031)")]
     public void Environment_NoFloodRisk_Scores200()
     {
-        // FloodRisk = null → environment score MUST be exactly 200
+        // FloodRisk.RiskLevel = null → environment score MUST be exactly 200
         var profile = new PropertyProfile
         {
             Address = MakeAddress(),
@@ -235,12 +245,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.FloodRisk!.RiskLevel == null),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(environment: 200));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.FloodRisk!.RiskLevel == null),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(environment: 200));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "environment");
         dim.Score.ShouldNotBeNull();
@@ -258,12 +270,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.FloodRisk!.RiskLevel == "critical"),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(environment: 0));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.FloodRisk!.RiskLevel == "critical"),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(environment: 0));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "environment");
         dim.Score.ShouldNotBeNull();
@@ -275,8 +289,7 @@ public sealed class DimensionRulesTests
     [Fact(Skip = "Red phase — AppreciationRules not implemented yet (T032)")]
     public void Appreciation_PositiveCagr_ScoresHigh()
     {
-        // IptuData shows positive valuation growth → appreciation score MUST be >= 120
-        // ValorVenal increased from prior year — inferred by engine from historical data
+        // IptuData present with positive valuation → appreciation score MUST be >= 120
         var profile = new PropertyProfile
         {
             Address = MakeAddress(),
@@ -284,12 +297,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.IptuData != null),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(appreciation: 130));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.IptuData != null),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(appreciation: 130));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "appreciation");
         dim.Score.ShouldNotBeNull();
@@ -301,9 +316,7 @@ public sealed class DimensionRulesTests
     [Fact(Skip = "Red phase — UrbanContextRules not implemented yet (T033)")]
     public void UrbanContext_HighIncome_ScoresHigh()
     {
-        // CensusData.MedianIncomeGroup >= 8 (out of 10) → urban_context score MUST be >= 130
-        // Note: tasks.md uses 1–10 scale; PropertyProfile.CensusData uses 1–5 scale.
-        // Mapping: tasks group 8+ ≈ domain group 4+ (top 40%)
+        // CensusData.MedianIncomeGroup >= 4 (top quintile, scale 1–5) → urban_context score MUST be >= 130
         var profile = new PropertyProfile
         {
             Address = MakeAddress(),
@@ -311,12 +324,14 @@ public sealed class DimensionRulesTests
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Is<PropertyProfile>(p => p.CensusData!.MedianIncomeGroup >= 4),
-                       Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(urbanContext: 150));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.Is<PropertyProfile>(p => p.CensusData!.MedianIncomeGroup >= 4),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(urbanContext: 150));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         var dim = result.DimensionScores.Single(d => d.Dimension == "urban_context");
         dim.Score.ShouldNotBeNull();
@@ -328,21 +343,22 @@ public sealed class DimensionRulesTests
     [Fact(Skip = "Red phase — PropertyAnalysisEngine not implemented yet (T034)")]
     public void Engine_CompositeScore_IsSumOfAvailableDimensions()
     {
-        // composite = sum of available dimension scores
-        // max = 200 × number of available dimensions
         var profile = new PropertyProfile
         {
             Address = MakeAddress(),
             ProvidersUnavailable = []
         };
 
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Any<PropertyProfile>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(
-                  security: 118, mobility: 185, infrastructure: 162,
-                  environment: 95, appreciation: 104, urbanContext: 60));
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.IsAny<PropertyProfile>(),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(MakeAnalysis(
+                security: 118, mobility: 185, infrastructure: 162,
+                environment: 95, appreciation: 104, urbanContext: 60));
 
-        var result = engine.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
+        var result = mockEngine.Object.Analyze(profile, Guid.NewGuid(), Guid.NewGuid(), null);
 
         result.CompositeScore.ShouldBe(724);
         result.CompositeMax.ShouldBe(1200);
@@ -351,15 +367,19 @@ public sealed class DimensionRulesTests
     [Fact(Skip = "Red phase — PropertyAnalysisEngine not implemented yet (T034)")]
     public void Engine_Grade_IsComputedFromCompositePercentage()
     {
-        // 724 / 1000 = 72.4% → B+ (70–79%)
-        // Grade mapping from contracts/analyze-endpoint.md
-        var engine = Substitute.For<IPropertyAnalysisEngine>();
-        engine.Analyze(Arg.Any<PropertyProfile>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string?>())
-              .Returns(MakeAnalysis(
-                  security: 118, mobility: 185, infrastructure: 162,
-                  environment: 95, appreciation: 104, urbanContext: 60) with { Grade = "B+" });
+        // 724 / 1000 = 72.4% → B+ (70–79%) — grade mapping from contracts/analyze-endpoint.md
+        var analysis = MakeAnalysis(
+            security: 118, mobility: 185, infrastructure: 162,
+            environment: 95, appreciation: 104, urbanContext: 60) with { Grade = "B+" };
 
-        var result = engine.Analyze(
+        var mockEngine = new Mock<IPropertyAnalysisEngine>();
+        mockEngine
+            .Setup(e => e.Analyze(
+                It.IsAny<PropertyProfile>(),
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>()))
+            .Returns(analysis);
+
+        var result = mockEngine.Object.Analyze(
             new PropertyProfile { Address = MakeAddress(), ProvidersUnavailable = [] },
             Guid.NewGuid(), Guid.NewGuid(), null);
 
