@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Providers.Ibge;
 /// Queries the local PostGIS <c>census_sectors</c> table (IBGE Censo 2022).
 /// Returns socioeconomic data for the census sector that contains the address point.
 /// </summary>
-public sealed class IbgeCensusProvider : IDataProvider<CensusData>
+public sealed partial class IbgeCensusProvider : IDataProvider<CensusData>
 {
     private readonly IDbContextFactory<PropertyIntelligenceDbContext> _dbFactory;
     private readonly ICacheService _cache;
@@ -41,7 +41,7 @@ public sealed class IbgeCensusProvider : IDataProvider<CensusData>
 
         if (address.Lat is null || address.Lng is null)
         {
-            _logger.LogWarning("IbgeCensusProvider: no coordinates for {Address}", address.NormalizedAddress);
+            LogNoCoordinates(_logger, address.NormalizedAddress);
             return new CensusData();
         }
 
@@ -83,11 +83,20 @@ public sealed class IbgeCensusProvider : IDataProvider<CensusData>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "IbgeCensusProvider: query failed for {Address}", address.NormalizedAddress);
+            LogQueryFailed(_logger, ex, address.NormalizedAddress);
             return new CensusData();
         }
 
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
+
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "IbgeCensusProvider: no coordinates for {Address}; skipping PostGIS query")]
+    private static partial void LogNoCoordinates(ILogger logger, string address);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "IbgeCensusProvider: PostGIS query failed for {Address}")]
+    private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }

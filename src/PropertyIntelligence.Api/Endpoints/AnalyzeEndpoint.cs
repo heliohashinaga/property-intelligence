@@ -14,7 +14,7 @@ namespace PropertyIntelligence.Api.Endpoints;
 /// POST /v1/property/analyze — the main scoring endpoint.
 /// Orchestrates: normalize → enrich → analyze → explain → persist → respond.
 /// </summary>
-public static class AnalyzeEndpoint
+public static partial class AnalyzeEndpoint
 {
     public static IEndpointRouteBuilder MapAnalyzeEndpoint(this IEndpointRouteBuilder app)
     {
@@ -46,7 +46,7 @@ public static class AnalyzeEndpoint
         if (string.IsNullOrWhiteSpace(request.Address))
         {
             return Results.Json(
-                new { error = "validation_error", message = "O campo 'address' é obrigatório.", field = "address" },
+                new { error = "validation_error", message = "The 'address' field is required.", field = "address" },
                 statusCode: 400);
         }
 
@@ -58,16 +58,14 @@ public static class AnalyzeEndpoint
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Address normalization failed. CorrelationId={CorrelationId} Input={Input}",
-                correlationId, request.Address);
+            LogNormalizationFailed(logger, ex, correlationId, request.Address);
             address = null;
         }
 
         if (address is null)
         {
             return Results.Json(
-                new { error = "address_unrecognized", message = "Endereço não reconhecido ou muito ambíguo para análise." },
+                new { error = "address_unrecognized", message = "Address not recognized or too ambiguous to analyze." },
                 statusCode: 422);
         }
 
@@ -98,7 +96,7 @@ public static class AnalyzeEndpoint
                 new
                 {
                     error   = "insufficient_data",
-                    message = "Dados insuficientes para gerar uma análise confiável. Tente novamente mais tarde.",
+                    message = "Insufficient data to generate a reliable analysis. Please try again later.",
                     providers_unavailable = profile.ProvidersUnavailable,
                 },
                 statusCode: 503);
@@ -121,9 +119,7 @@ public static class AnalyzeEndpoint
         await PersistAnalysisAsync(db, analysis, address.Id, requestStart, ct);
 
         sw.Stop();
-        logger.LogInformation(
-            "Analysis complete. CorrelationId={CorrelationId} Address={Address} " +
-            "Composite={Composite}/{Max} Grade={Grade} DurationMs={Ms}",
+        LogAnalysisComplete(logger,
             correlationId, address.NormalizedAddress,
             analysis.CompositeScore, analysis.CompositeMax, analysis.Grade, sw.ElapsedMilliseconds);
 
@@ -204,6 +200,21 @@ public static class AnalyzeEndpoint
             analyzed_at           = analysis.CreatedAt,
         };
     }
+}
+
+// [LoggerMessage] partial definitions — source-generated at compile time, zero allocations
+public static partial class AnalyzeEndpoint
+{
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Address normalization failed. CorrelationId={CorrelationId} Input={Input}")]
+    private static partial void LogNormalizationFailed(
+        ILogger logger, Exception ex, string correlationId, string? input);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Analysis complete. CorrelationId={CorrelationId} Address={Address} Composite={Composite}/{Max} Grade={Grade} DurationMs={DurationMs}")]
+    private static partial void LogAnalysisComplete(
+        ILogger logger, string correlationId, string address,
+        int composite, int max, string grade, long durationMs);
 }
 
 /// <summary>Marker type for ILogger injection (avoids generic open-type issues).</summary>

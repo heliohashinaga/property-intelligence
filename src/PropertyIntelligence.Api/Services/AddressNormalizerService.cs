@@ -14,7 +14,7 @@ namespace PropertyIntelligence.Api.Services;
 ///   2. Otherwise → query Nominatim (OpenStreetMap geocoder).
 /// Returns <c>null</c> when the address cannot be resolved (caller should return HTTP 422).
 /// </summary>
-public sealed class AddressNormalizerService : IAddressNormalizer
+public sealed partial class AddressNormalizerService : IAddressNormalizer
 {
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -59,7 +59,7 @@ public sealed class AddressNormalizerService : IAddressNormalizer
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "ViaCEP lookup failed for CEP {Cep}; falling back to Nominatim", cep);
+                LogViaCepFailed(_logger, ex, cep);
             }
         }
 
@@ -86,7 +86,7 @@ public sealed class AddressNormalizerService : IAddressNormalizer
             var root = doc.RootElement;
             if (root.GetArrayLength() == 0)
             {
-                _logger.LogInformation("Nominatim returned no results for '{RawAddress}'", rawAddress);
+                LogNominatimNoResults(_logger, rawAddress);
                 return null;
             }
 
@@ -95,7 +95,7 @@ public sealed class AddressNormalizerService : IAddressNormalizer
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Nominatim geocoding failed for '{RawAddress}'", rawAddress);
+            LogNominatimFailed(_logger, ex, rawAddress);
             return null;
         }
     }
@@ -146,4 +146,16 @@ public sealed class AddressNormalizerService : IAddressNormalizer
 
     private static string? GetString(JsonElement element, string property) =>
         element.TryGetProperty(property, out var prop) ? prop.GetString() : null;
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "ViaCEP lookup failed for CEP {Cep}; falling back to Nominatim")]
+    private static partial void LogViaCepFailed(ILogger logger, Exception ex, string cep);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Nominatim returned no results for '{RawAddress}'")]
+    private static partial void LogNominatimNoResults(ILogger logger, string rawAddress);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Nominatim geocoding failed for '{RawAddress}'")]
+    private static partial void LogNominatimFailed(ILogger logger, Exception ex, string rawAddress);
 }

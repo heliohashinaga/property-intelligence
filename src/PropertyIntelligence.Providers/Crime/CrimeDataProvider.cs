@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Providers.Crime;
 /// Queries the local <c>crime_records</c> table (SSP-SP CSV import).
 /// Returns crime rate per 100 k residents for a rolling 2-year window.
 /// </summary>
-public sealed class CrimeDataProvider : IDataProvider<CrimeData>
+public sealed partial class CrimeDataProvider : IDataProvider<CrimeData>
 {
     // Fallback population when no IBGE census data is available.
     // São Paulo city population (IBGE 2022 estimate).
@@ -79,11 +79,15 @@ public sealed class CrimeDataProvider : IDataProvider<CrimeData>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "CrimeDataProvider: query failed for {City}", city);
+            LogQueryFailed(_logger, ex, city);
             return new CrimeData();
         }
 
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "CrimeDataProvider: query failed for {City}")]
+    private static partial void LogQueryFailed(ILogger logger, Exception ex, string city);
 }

@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Api.Middleware;
 /// Attaches the resolved <see cref="ApiConsumer"/> and client IP to
 /// <see cref="HttpContext.Items"/> for downstream audit use.
 /// </summary>
-public sealed class ApiKeyAuthMiddleware
+public sealed partial class ApiKeyAuthMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ApiKeyAuthMiddleware> _logger;
@@ -48,9 +48,7 @@ public sealed class ApiKeyAuthMiddleware
 
         if (consumer is null)
         {
-            _logger.LogWarning(
-                "Invalid or inactive API key. HashPrefix={HashPrefix}",
-                keyHash[..8]);
+            LogInvalidApiKey(_logger, keyHash[..8]);
             await WriteUnauthorizedAsync(context, "Invalid API key");
             return;
         }
@@ -84,4 +82,8 @@ public sealed class ApiKeyAuthMiddleware
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Invalid or inactive API key. HashPrefix={HashPrefix}")]
+    private static partial void LogInvalidApiKey(ILogger logger, string hashPrefix);
 }

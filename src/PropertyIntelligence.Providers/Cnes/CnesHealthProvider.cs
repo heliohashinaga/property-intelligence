@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Providers.Cnes;
 /// Queries the local PostGIS <c>health_facilities</c> table (CNES / DataSUS import).
 /// Returns counts of hospitals, clinics, and emergency units within 2 km of the address.
 /// </summary>
-public sealed class CnesHealthProvider : IDataProvider<HealthData>
+public sealed partial class CnesHealthProvider : IDataProvider<HealthData>
 {
     private readonly IDbContextFactory<PropertyIntelligenceDbContext> _dbFactory;
     private readonly ICacheService _cache;
@@ -41,7 +41,7 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
 
         if (address.Lat is null || address.Lng is null)
         {
-            _logger.LogWarning("CnesHealthProvider: no coordinates for {Address}", address.NormalizedAddress);
+            LogNoCoordinates(_logger, address.NormalizedAddress);
             return new HealthData();
         }
 
@@ -100,11 +100,20 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "CnesHealthProvider: query failed for {Address}", address.NormalizedAddress);
+            LogQueryFailed(_logger, ex, address.NormalizedAddress);
             return new HealthData();
         }
 
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
+
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "CnesHealthProvider: no coordinates for {Address}; skipping PostGIS query")]
+    private static partial void LogNoCoordinates(ILogger logger, string address);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "CnesHealthProvider: PostGIS query failed for {Address}")]
+    private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }

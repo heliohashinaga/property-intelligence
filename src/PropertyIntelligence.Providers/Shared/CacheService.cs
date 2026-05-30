@@ -10,7 +10,7 @@ namespace PropertyIntelligence.Providers.Shared;
 /// All Redis errors are caught, logged, and swallowed — callers receive a cache miss
 /// rather than an exception, keeping the system resilient when Redis is unavailable.
 /// </summary>
-public sealed class CacheService : ICacheService
+public sealed partial class CacheService : ICacheService
 {
     private readonly IDatabase _db;
     private readonly ILogger<CacheService> _logger;
@@ -41,12 +41,12 @@ public sealed class CacheService : ICacheService
         }
         catch (RedisException ex)
         {
-            _logger.LogWarning(ex, "Redis GET failed for key {Key}; treating as cache miss", key);
+            LogRedisGetFailed(_logger, key, ex);
             return default;
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to deserialize cached value for key {Key}; treating as cache miss", key);
+            LogDeserializeFailed(_logger, key, ex);
             return default;
         }
     }
@@ -61,7 +61,7 @@ public sealed class CacheService : ICacheService
         }
         catch (RedisException ex)
         {
-            _logger.LogWarning(ex, "Redis SET failed for key {Key}; cache write skipped", key);
+            LogRedisSetFailed(_logger, key, ex);
         }
     }
 
@@ -74,7 +74,23 @@ public sealed class CacheService : ICacheService
         }
         catch (RedisException ex)
         {
-            _logger.LogWarning(ex, "Redis DEL failed for key {Key}", key);
+            LogRedisDelFailed(_logger, key, ex);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Redis GET failed for key {Key}; treating as cache miss")]
+    private static partial void LogRedisGetFailed(ILogger logger, string key, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Failed to deserialize cached value for key {Key}; treating as cache miss")]
+    private static partial void LogDeserializeFailed(ILogger logger, string key, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Redis SET failed for key {Key}; cache write skipped")]
+    private static partial void LogRedisSetFailed(ILogger logger, string key, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Redis DEL failed for key {Key}")]
+    private static partial void LogRedisDelFailed(ILogger logger, string key, Exception ex);
 }

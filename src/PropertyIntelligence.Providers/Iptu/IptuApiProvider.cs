@@ -13,7 +13,7 @@ namespace PropertyIntelligence.Providers.Iptu;
 /// Returns <c>null</c> gracefully on 404 or error — IPTU data is best-effort.
 /// Implements <see cref="IDataProvider{IptuData}"/>.
 /// </summary>
-public sealed class IptuApiProvider : IDataProvider<IptuData?>
+public sealed partial class IptuApiProvider : IDataProvider<IptuData?>
 {
     public string   ProviderName => "iptu_api";
     public TimeSpan CacheTtl     => TimeSpan.FromDays(30);
@@ -78,7 +78,7 @@ public sealed class IptuApiProvider : IDataProvider<IptuData?>
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                _logger.LogInformation("IptuApiProvider: no record for '{Address}'", address.NormalizedAddress);
+                LogNoRecord(_logger, address.NormalizedAddress);
                 return null;
             }
 
@@ -99,8 +99,7 @@ public sealed class IptuApiProvider : IDataProvider<IptuData?>
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "IptuApiProvider: error fetching IPTU data for '{Address}'",
-                address.NormalizedAddress);
+            LogFetchFailed(_logger, ex, address.NormalizedAddress);
             return null;
         }
     }
@@ -126,4 +125,12 @@ public sealed class IptuApiProvider : IDataProvider<IptuData?>
             .Replace("ç", "c")
             .Replace(" ", "-");
     }
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "IptuApiProvider: no IPTU record found for '{Address}'")]
+    private static partial void LogNoRecord(ILogger logger, string address);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "IptuApiProvider: error fetching IPTU data for '{Address}'")]
+    private static partial void LogFetchFailed(ILogger logger, Exception ex, string address);
 }

@@ -101,7 +101,7 @@ builder.Services.AddScoped<IDataProvider<CensusData>, IbgeCensusProvider>();
 builder.Services.AddScoped<IDataProvider<CrimeData>, CrimeDataProvider>();
 builder.Services.AddScoped<IDataProvider<HealthData>, CnesHealthProvider>();
 builder.Services.AddScoped<IDataProvider<SchoolData>, InepSchoolProvider>();
-builder.Services.AddScoped<IDataProvider<IptuData>, IptuApiProvider>();
+builder.Services.AddScoped<IDataProvider<IptuData?>, IptuApiProvider>();
 builder.Services.AddScoped<PropertyEnrichmentModule>();
 
 // NRules engine (T027-T034)
@@ -112,22 +112,36 @@ builder.Services.AddScoped<IPropertyAnalysisEngine, PropertyAnalysisEngine>();
 
 // LLM explainability (T035)
 // ── HTTP Clients com resiliência (Polly v8 via Microsoft.Extensions.Http.Resilience) ──
+// ── URLs de providers via appsettings.json (seção Providers) ─────────────────
+// Sobrescreva em appsettings.Development.json, variáveis de ambiente ou
+// em testes via WebApplicationFactory.WithWebHostBuilder para apontar ao WireMock.
+var p = builder.Configuration.GetSection("Providers");
+var urlViaCep    = p["ViaCep:BaseUrl"]     ?? "https://viacep.com.br";
+var urlNominatim = p["Nominatim:BaseUrl"]  ?? "https://nominatim.openstreetmap.org";
+var urlNominatimUA = p["Nominatim:UserAgent"] ?? "PropertyIntelligence/1.0 (contact@hashinaga.dev)";
+var urlOverpass  = p["Overpass:BaseUrl"]   ?? "https://overpass-api.de";
+var urlIptuApi   = p["IptuApi:BaseUrl"]    ?? "https://api.iptuapi.com.br";
+var urlOpenRouter = p["OpenRouter:BaseUrl"] ?? "https://openrouter.ai";
+var orReferer    = p["OpenRouter:HttpReferer"] ?? "https://property-intelligence.hashinaga.dev";
+var orTitle      = p["OpenRouter:AppTitle"] ?? "Property Intelligence";
+
 // Cada cliente tem retry + circuit breaker calibrados para o SLA do provider.
 // O SafeFetchAsync do EnrichmentModule ainda impõe o timeout global de 5s por provider.
 
 // OpenRouter (LLM) — best-effort, sem retry (falha silenciosa é comportamento correto)
 builder.Services.AddHttpClient("openrouter", client =>
 {
+    client.BaseAddress = new Uri(urlOpenRouter);
     client.DefaultRequestHeaders.Add("Authorization",
         $"Bearer {builder.Configuration["OPENROUTER_API_KEY"] ?? string.Empty}");
-    client.DefaultRequestHeaders.Add("HTTP-Referer", "https://property-intelligence.hashinaga.dev");
-    client.DefaultRequestHeaders.Add("X-Title", "Property Intelligence");
+    client.DefaultRequestHeaders.Add("HTTP-Referer", orReferer);
+    client.DefaultRequestHeaders.Add("X-Title", orTitle);
     client.Timeout = TimeSpan.FromSeconds(12);
 });
 // Sem resilience handler no LLM — timeout do HttpClient é suficiente
 
 // ViaCEP — lookup determinístico, 2 retries com backoff de 500ms
-builder.Services.AddHttpClient("viacep", c => c.BaseAddress = new Uri("https://viacep.com.br"))
+builder.Services.AddHttpClient("viacep", c => c.BaseAddress = new Uri(urlViaCep))
     .AddResilienceHandler("viacep-resilience", pipeline =>
     {
         pipeline.AddRetry(new HttpRetryStrategyOptions
@@ -153,8 +167,8 @@ builder.Services.AddHttpClient("viacep", c => c.BaseAddress = new Uri("https://v
 // Nominatim (OSM) — rate-limited externamente; 1 retry, timeout conservador
 builder.Services.AddHttpClient("nominatim", c =>
 {
-    c.BaseAddress = new Uri("https://nominatim.openstreetmap.org");
-    c.DefaultRequestHeaders.Add("User-Agent", "PropertyIntelligence/1.0 (contact@hashinaga.dev)");
+    c.BaseAddress = new Uri(urlNominatim);
+    c.DefaultRequestHeaders.Add("User-Agent", urlNominatimUA);
 })
     .AddResilienceHandler("nominatim-resilience", pipeline =>
     {
@@ -178,7 +192,7 @@ builder.Services.AddHttpClient("nominatim", c =>
     });
 
 // Overpass (OSM) — pode ser lento em pico; 2 retries com backoff
-builder.Services.AddHttpClient("overpass", c => c.BaseAddress = new Uri("https://overpass-api.de"))
+builder.Services.AddHttpClient("overpass", c => c.BaseAddress = new Uri(urlOverpass))
     .AddResilienceHandler("overpass-resilience", pipeline =>
     {
         pipeline.AddRetry(new HttpRetryStrategyOptions
@@ -202,7 +216,7 @@ builder.Services.AddHttpClient("overpass", c => c.BaseAddress = new Uri("https:/
     });
 
 // IPTU API — free tier com limite de quota; 1 retry, circuit breaker agressivo
-builder.Services.AddHttpClient("iptuapi", c => c.BaseAddress = new Uri("https://api.iptuapi.com.br"))
+builder.Services.AddHttpClient("iptuapi", c => c.BaseAddress = new Uri(urlIptuApi))
     .AddResilienceHandler("iptuapi-resilience", pipeline =>
     {
         pipeline.AddRetry(new HttpRetryStrategyOptions

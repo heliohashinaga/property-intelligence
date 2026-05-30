@@ -10,7 +10,7 @@ namespace PropertyIntelligence.Core.Services;
 /// Each provider has a 5-second individual timeout; failures are recorded in
 /// <see cref="PropertyProfile.ProvidersUnavailable"/> and never propagate (Constitution §V).
 /// </summary>
-public sealed class PropertyEnrichmentModule
+public sealed partial class PropertyEnrichmentModule
 {
     private static readonly TimeSpan ProviderTimeout = TimeSpan.FromSeconds(5);
 
@@ -20,7 +20,7 @@ public sealed class PropertyEnrichmentModule
     private readonly IDataProvider<CrimeData>       _crime;
     private readonly IDataProvider<HealthData>      _cnes;
     private readonly IDataProvider<SchoolData>      _inep;
-    private readonly IDataProvider<IptuData> _iptu;
+    private readonly IDataProvider<IptuData?> _iptu;
     private readonly ILogger<PropertyEnrichmentModule> _logger;
 
     public PropertyEnrichmentModule(
@@ -30,7 +30,7 @@ public sealed class PropertyEnrichmentModule
         IDataProvider<CrimeData>       crime,
         IDataProvider<HealthData>      cnes,
         IDataProvider<SchoolData>      inep,
-        IDataProvider<IptuData> iptu,
+        IDataProvider<IptuData?> iptu,
         ILogger<PropertyEnrichmentModule> logger)
     {
         _overpass = overpass;
@@ -86,7 +86,7 @@ public sealed class PropertyEnrichmentModule
         CancellationToken ct,
         List<string> unavailable,
         string correlationId)
-        where TResult : class
+        where TResult : class?
     {
         var sw = Stopwatch.StartNew();
         try
@@ -95,26 +95,35 @@ public sealed class PropertyEnrichmentModule
             cts.CancelAfter(ProviderTimeout);
 
             var result = await provider.FetchAsync(address, cts.Token);
-            _logger.LogDebug(
-                "Provider {Provider} completed in {Ms}ms. CorrelationId={CorrelationId}",
-                provider.ProviderName, sw.ElapsedMilliseconds, correlationId);
+            LogProviderCompleted(_logger, provider.ProviderName, sw.ElapsedMilliseconds, correlationId);
             return result;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning(
-                "Provider {Provider} timed out after {Ms}ms. CorrelationId={CorrelationId}",
-                provider.ProviderName, sw.ElapsedMilliseconds, correlationId);
+            LogProviderTimedOut(_logger, provider.ProviderName, sw.ElapsedMilliseconds, correlationId);
             lock (unavailable) unavailable.Add(provider.ProviderName);
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
-                "Provider {Provider} failed after {Ms}ms. CorrelationId={CorrelationId}",
-                provider.ProviderName, sw.ElapsedMilliseconds, correlationId);
+            LogProviderFailed(_logger, provider.ProviderName, sw.ElapsedMilliseconds, correlationId, ex);
             lock (unavailable) unavailable.Add(provider.ProviderName);
             return null;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Debug,
+        Message = "Provider {Provider} completed in {DurationMs}ms. CorrelationId={CorrelationId}")]
+    private static partial void LogProviderCompleted(
+        ILogger logger, string provider, long durationMs, string correlationId);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Provider {Provider} timed out after {DurationMs}ms. CorrelationId={CorrelationId}")]
+    private static partial void LogProviderTimedOut(
+        ILogger logger, string provider, long durationMs, string correlationId);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Provider {Provider} failed after {DurationMs}ms. CorrelationId={CorrelationId}")]
+    private static partial void LogProviderFailed(
+        ILogger logger, string provider, long durationMs, string correlationId, Exception ex);
 }

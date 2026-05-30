@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Providers.Ana;
 /// Queries the local PostGIS <c>flood_risk_zones</c> table imported from ANA SNIRH shapefiles.
 /// Returns the highest-severity flood risk level that intersects the address point.
 /// </summary>
-public sealed class AnaFloodRiskProvider : IDataProvider<FloodRiskData>
+public sealed partial class AnaFloodRiskProvider : IDataProvider<FloodRiskData>
 {
     private readonly IDbContextFactory<PropertyIntelligenceDbContext> _dbFactory;
     private readonly ICacheService _cache;
@@ -42,8 +42,7 @@ public sealed class AnaFloodRiskProvider : IDataProvider<FloodRiskData>
         // No coordinates → cannot intersect
         if (address.Lat is null || address.Lng is null)
         {
-            _logger.LogWarning("AnaFloodRiskProvider: address {Address} has no coordinates; skipping PostGIS query",
-                address.NormalizedAddress);
+            LogNoCoordinates(_logger, address.NormalizedAddress);
             return new FloodRiskData { RiskLevel = null };
         }
 
@@ -79,11 +78,20 @@ public sealed class AnaFloodRiskProvider : IDataProvider<FloodRiskData>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AnaFloodRiskProvider: PostGIS query failed for {Address}", address.NormalizedAddress);
+            LogQueryFailed(_logger, ex, address.NormalizedAddress);
             return new FloodRiskData { RiskLevel = null };
         }
 
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
+
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "AnaFloodRiskProvider: no coordinates for {Address}; skipping PostGIS query")]
+    private static partial void LogNoCoordinates(ILogger logger, string address);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "AnaFloodRiskProvider: PostGIS query failed for {Address}")]
+    private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }

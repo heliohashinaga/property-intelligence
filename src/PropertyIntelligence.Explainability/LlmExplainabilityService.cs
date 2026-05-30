@@ -13,13 +13,13 @@ namespace PropertyIntelligence.Explainability;
 /// Best-effort: always returns null on failure — NEVER throws (Constitution §V).
 /// Model selected via <c>LLM_MODEL</c> env var; falls back to a free model.
 /// </summary>
-public sealed class LlmExplainabilityService : IExplainabilityService
+public sealed partial class LlmExplainabilityService : IExplainabilityService
 {
-    private const string OpenRouterEndpoint = "https://openrouter.ai/api/v1/chat/completions";
-    private const string FallbackModel      = "meta-llama/llama-3.1-8b-instruct:free";
+    private const string DefaultFallbackModel = "meta-llama/llama-3.1-8b-instruct:free";
+    private const string ChatCompletionsPath   = "api/v1/chat/completions";
 
-    private readonly HttpClient    _http;
-    private readonly string        _model;
+    private readonly HttpClient _http;
+    private readonly string     _model;
     private readonly ILogger<LlmExplainabilityService> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -33,7 +33,9 @@ public sealed class LlmExplainabilityService : IExplainabilityService
         ILogger<LlmExplainabilityService> logger)
     {
         _http   = httpFactory.CreateClient("openrouter");
-        _model  = configuration["LLM_MODEL"] ?? FallbackModel;
+        _model  = configuration["LLM_MODEL"]
+               ?? configuration["Providers:OpenRouter:FallbackModel"]
+               ?? DefaultFallbackModel;
         _logger = logger;
     }
 
@@ -63,13 +65,11 @@ public sealed class LlmExplainabilityService : IExplainabilityService
             };
 
             using var response = await _http.PostAsJsonAsync(
-                OpenRouterEndpoint, requestBody, JsonOpts, cts.Token);
+                ChatCompletionsPath, requestBody, JsonOpts, cts.Token);
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning(
-                    "OpenRouter returned {Status} for model {Model}",
-                    response.StatusCode, _model);
+                LogOpenRouterError(_logger, response.StatusCode, _model);
                 return null;
             }
 
@@ -86,12 +86,12 @@ public sealed class LlmExplainabilityService : IExplainabilityService
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("LLM insight generation timed out for analysis {Id}", analysis.Id);
+            LogInsightTimeout(_logger, analysis.Id);
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "LLM insight generation failed for analysis {Id}", analysis.Id);
+            LogInsightFailed(_logger, ex, analysis.Id);
             return null;
         }
     }
@@ -127,4 +127,17 @@ public sealed class LlmExplainabilityService : IExplainabilityService
 
         return sb.ToString();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "OpenRouter returned {Status} for model {Model}")]
+    private static partial void LogOpenRouterError(
+        ILogger logger, System.Net.HttpStatusCode status, string model);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "LLM insight generation timed out for analysis {AnalysisId}")]
+    private static partial void LogInsightTimeout(ILogger logger, Guid analysisId);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "LLM insight generation failed for analysis {AnalysisId}")]
+    private static partial void LogInsightFailed(ILogger logger, Exception ex, Guid analysisId);
 }

@@ -11,7 +11,7 @@ namespace PropertyIntelligence.Providers.Overpass;
 /// Fetches Points of Interest (POI) counts from OpenStreetMap via the Overpass API.
 /// Implements <see cref="IDataProvider{PoiData}"/>.
 /// </summary>
-public sealed class OverpassPoiProvider : IDataProvider<PoiData>
+public sealed partial class OverpassPoiProvider : IDataProvider<PoiData>
 {
     public string   ProviderName => "overpass";
     public TimeSpan CacheTtl     => TimeSpan.FromDays(7);
@@ -41,8 +41,7 @@ public sealed class OverpassPoiProvider : IDataProvider<PoiData>
     {
         if (address.Lat is null || address.Lng is null)
         {
-            _logger.LogWarning("OverpassPoiProvider: coordinates missing for '{Address}'; returning empty PoiData",
-                address.NormalizedAddress);
+            LogNoCoordinates(_logger, address.NormalizedAddress);
             return new PoiData();
         }
 
@@ -175,4 +174,8 @@ public sealed class OverpassPoiProvider : IDataProvider<PoiData>
     }
 
     private static double ToRad(double deg) => deg * Math.PI / 180.0;
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "OverpassPoiProvider: coordinates missing for '{Address}'; returning empty PoiData")]
+    private static partial void LogNoCoordinates(ILogger logger, string address);
 }

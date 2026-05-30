@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Providers.Inep;
 /// Queries the local PostGIS <c>school_records</c> table (INEP / IDEB import).
 /// Returns the nearest school's IDEB score and counts of high-quality schools within 2 km.
 /// </summary>
-public sealed class InepSchoolProvider : IDataProvider<SchoolData>
+public sealed partial class InepSchoolProvider : IDataProvider<SchoolData>
 {
     private readonly IDbContextFactory<PropertyIntelligenceDbContext> _dbFactory;
     private readonly ICacheService _cache;
@@ -41,7 +41,7 @@ public sealed class InepSchoolProvider : IDataProvider<SchoolData>
 
         if (address.Lat is null || address.Lng is null)
         {
-            _logger.LogWarning("InepSchoolProvider: no coordinates for {Address}", address.NormalizedAddress);
+            LogNoCoordinates(_logger, address.NormalizedAddress);
             return new SchoolData();
         }
 
@@ -103,11 +103,20 @@ public sealed class InepSchoolProvider : IDataProvider<SchoolData>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "InepSchoolProvider: query failed for {Address}", address.NormalizedAddress);
+            LogQueryFailed(_logger, ex, address.NormalizedAddress);
             return new SchoolData();
         }
 
         await _cache.SetAsync(cacheKey, result, CacheTtl, ct);
         return result;
     }
+
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "InepSchoolProvider: no coordinates for {Address}; skipping PostGIS query")]
+    private static partial void LogNoCoordinates(ILogger logger, string address);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "InepSchoolProvider: PostGIS query failed for {Address}")]
+    private static partial void LogQueryFailed(ILogger logger, Exception ex, string address);
 }

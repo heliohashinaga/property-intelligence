@@ -12,7 +12,7 @@ namespace PropertyIntelligence.Providers.ViaCep;
 /// Fetches structured address data from ViaCEP and resolves lat/lng via Nominatim.
 /// Implements <see cref="IDataProvider{PropertyAddress}"/>.
 /// </summary>
-public sealed class ViaCepProvider : IDataProvider<PropertyAddress>
+public sealed partial class ViaCepProvider : IDataProvider<PropertyAddress>
 {
     public string   ProviderName => "viacep";
     public TimeSpan CacheTtl     => TimeSpan.FromDays(30);
@@ -83,7 +83,7 @@ public sealed class ViaCepProvider : IDataProvider<PropertyAddress>
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Nominatim geocoding failed for CEP {Cep}; coordinates will be null", cep);
+            LogNominatimFailed(_logger, ex, cep);
         }
 
         var normalized = BuildNormalized(dto);
@@ -161,4 +161,8 @@ public sealed class ViaCepProvider : IDataProvider<PropertyAddress>
 
         return null;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Nominatim geocoding failed for CEP {Cep}; coordinates will be null")]
+    private static partial void LogNominatimFailed(ILogger logger, Exception ex, string cep);
 }
