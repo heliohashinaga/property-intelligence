@@ -18,4 +18,11 @@ public interface ICacheService
 
     /// <summary>Removes the cached entry for <paramref name="key"/> (no-op if absent).</summary>
     Task RemoveAsync(string key, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes the composed analysis cache entry for the given normalized address.
+    /// Called when <c>Cache-Control: no-cache</c> is received on the analyze endpoint.
+    /// Provider-level TTL caches (per-source Redis entries) are NOT affected.
+    /// </summary>
+    Task InvalidateAnalysisAsync(string normalizedAddress, CancellationToken ct = default);
 }

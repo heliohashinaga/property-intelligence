@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using PropertyIntelligence.Api.Logging;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 using PropertyIntelligence.Providers.ViaCep;
@@ -86,7 +87,7 @@ public sealed partial class AddressNormalizerService : IAddressNormalizer
             var root = doc.RootElement;
             if (root.GetArrayLength() == 0)
             {
-                LogNominatimNoResults(_logger, rawAddress);
+                LogNominatimNoResults(_logger, AddressLogEnricher.Hash(rawAddress));
                 return null;
             }
 
@@ -95,7 +96,7 @@ public sealed partial class AddressNormalizerService : IAddressNormalizer
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogNominatimFailed(_logger, ex, rawAddress);
+            LogNominatimFailed(_logger, ex, AddressLogEnricher.Hash(rawAddress));
             return null;
         }
     }

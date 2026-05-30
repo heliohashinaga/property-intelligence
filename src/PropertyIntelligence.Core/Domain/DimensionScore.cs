@@ -12,7 +12,13 @@ public enum TrendDirection
 {
     Improving,
     Stable,
-    Worsening
+    Worsening,
+    /// <summary>
+    /// Returned when fewer than 3 months of historical data are available.
+    /// Serialises as <c>"insufficient_data"</c> in the API response.
+    /// Never defaults to <see cref="Stable"/> when data is absent.
+    /// </summary>
+    InsufficientData
 }
 
 /// <summary>

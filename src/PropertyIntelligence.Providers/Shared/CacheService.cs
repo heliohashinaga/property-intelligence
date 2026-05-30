@@ -78,6 +78,25 @@ public sealed partial class CacheService : ICacheService
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Analysis cache key format: <c>analysis:{SHA256(normalizedAddress.ToLowerInvariant())[..16]}</c>
+    /// Only the composed analysis cache is removed; per-provider caches are unaffected.
+    /// </remarks>
+    public Task InvalidateAnalysisAsync(string normalizedAddress, CancellationToken ct = default)
+    {
+        var key = AnalysisCacheKey(normalizedAddress);
+        return RemoveAsync(key, ct);
+    }
+
+    /// <summary>Builds the Redis key for the composed analysis cache.</summary>
+    public static string AnalysisCacheKey(string normalizedAddress)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(normalizedAddress.ToLowerInvariant().Trim()));
+        return $"analysis:{Convert.ToHexString(hash)[..16].ToLowerInvariant()}";
+    }
+
     [LoggerMessage(Level = LogLevel.Warning,
         Message = "Redis GET failed for key {Key}; treating as cache miss")]
     private static partial void LogRedisGetFailed(ILogger logger, string key, Exception ex);

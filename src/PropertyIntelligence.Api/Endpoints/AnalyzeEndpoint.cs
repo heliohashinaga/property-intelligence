@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using PropertyIntelligence.Api.Logging;
 using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
@@ -41,6 +42,7 @@ public static partial class AnalyzeEndpoint
         IPropertyAnalysisEngine engine,
         IExplainabilityService  llm,
         PropertyIntelligenceDbContext db,
+        ICacheService           cacheService,
         TimeProvider            timeProvider,
         ILogger<AnalyzeEndpointMarker> logger,
         CancellationToken       ct)
@@ -51,6 +53,13 @@ public static partial class AnalyzeEndpoint
         var clientIp      = ctx.Items["ClientIp"]?.ToString();
         var requestStart  = timeProvider.GetUtcNow();
 
+        // ── Cache-Control: no-cache bypass (FR-007, T088) ─────────────────────
+        // When present, skip the composed analysis cache and force a fresh analysis.
+        // Provider-level Redis TTLs are NOT invalidated.
+        var forceRefresh = ctx.Request.Headers["Cache-Control"]
+            .ToString()
+            .Contains("no-cache", StringComparison.OrdinalIgnoreCase);
+
         // ── 1. Normalize address ──────────────────────────────────────────────
         PropertyAddress? address;
         try
@@ -59,7 +68,7 @@ public static partial class AnalyzeEndpoint
         }
         catch (Exception ex)
         {
-            LogNormalizationFailed(logger, ex, correlationId, request.Address);
+            LogNormalizationFailed(logger, ex, correlationId, AddressLogEnricher.Hash(request.Address));
             address = null;
         }
 
@@ -69,6 +78,10 @@ public static partial class AnalyzeEndpoint
                 new { error = "address_unrecognized", message = "Address not recognized or too ambiguous to analyze." },
                 statusCode: 422);
         }
+
+        // Invalidate analysis cache when Cache-Control: no-cache requested
+        if (forceRefresh)
+            await cacheService.InvalidateAnalysisAsync(address.NormalizedAddress, ct);
 
         // ── 3. Upsert property_addresses ──────────────────────────────────────
         var existingAddr = await db.PropertyAddresses
@@ -121,7 +134,7 @@ public static partial class AnalyzeEndpoint
 
         sw.Stop();
         LogAnalysisComplete(logger,
-            correlationId, address.NormalizedAddress,
+            correlationId, AddressLogEnricher.Hash(address.NormalizedAddress),
             analysis.CompositeScore, analysis.CompositeMax, analysis.Grade, sw.ElapsedMilliseconds);
 
         // ── 8. Build response ─────────────────────────────────────────────────
