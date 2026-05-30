@@ -18,6 +18,7 @@
 | `X-Api-Key` | ✅ Yes | Raw API key; validated against SHA-256 hash in DB |
 | `Content-Type` | ✅ Yes | Must be `application/json` |
 | `CF-Connecting-IP` | Auto | Set by Cloudflare; used as request_ip in audit log |
+| `Cache-Control` | ❌ No | Optional. `no-cache` forces fresh analysis; bypasses composed analysis cache only; provider-level Redis TTLs not affected; response returns `"cached": false` |
 
 ### Request Body
 
@@ -203,6 +204,15 @@ When multiple candidate matches exist:
 }
 ```
 
+### 422 Unprocessable Entity — Normalization service unavailable (ViaCEP + Nominatim both failed)
+
+```json
+{
+  "error": "address_normalization_failed",
+  "message": "Não foi possível normalizar o endereço: serviços de geocodificação indisponíveis. Tente novamente em instantes."
+}
+```
+
 ---
 
 ### 503 Service Unavailable — Fewer than 3 dimensions have data
@@ -225,9 +235,12 @@ When multiple candidate matches exist:
 | `address` length < 5 or > 300 chars | 400 |
 | `X-Api-Key` header missing | 401 |
 | `X-Api-Key` does not match any active consumer | 401 |
-| Address not resolvable via ViaCEP | 422 |
-| Address matches multiple municipalities | 422 with `candidates` |
+| Address not resolvable via ViaCEP (invalid CEP / 404) | 422 `address_unresolvable` |
+| ViaCEP + Nominatim both unavailable | 422 `address_normalization_failed` |
+| Address matches multiple municipalities | 422 `address_ambiguous` with `candidates` |
 | < 3 dimensions have data after enrichment | 503 |
+
+| `trend` field values | `improving` \| `stable` \| `worsening` \| `insufficient_data` — `insufficient_data` returned when < 3 months of historical data available for the dimension; never defaults to `stable` when data absent |
 
 ---
 

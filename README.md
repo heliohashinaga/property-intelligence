@@ -62,23 +62,35 @@
 
 ## Stack
 
-- API: .NET 10 (Minimal API)
-- Regras: NRules
-- Banco: PostgreSQL + PostGIS
-- Cache: Redis
-- IA: Claude API (insight PT-BR)
-- Frontend: Vue.js, Chart.js, Leaflet
-- Infra: Docker Compose, K8s
-- CI/CD: GitHub Actions
+| Camada | Tecnologia |
+|---|---|
+| API | .NET 10 Minimal API (C# 14) |
+| Dispatch CQRS | Dispatcher customizado (MIT, sem MediatR) |
+| Regras | NRules |
+| Banco | PostgreSQL + PostGIS |
+| Cache | Redis |
+| IA | OpenRouter — modelo via `LLM_MODEL` env var |
+| Frontend | Vue.js + Chart.js + Leaflet |
+| Dev local | .NET Aspire (orquestra API, Postgres, Redis) |
+| Infra | OpenTofu (Hetzner + Cloudflare) + K3s |
+| CI/CD | GitHub Actions |
 
 ---
 
 ## Execução Local
 
 ```sh
-docker compose up -d        # Banco, Redis, tunel
-dotnet run --project src/PropertyIntelligence.Api   # API
-dotnet test                 # Executar todos os testes
+# Inicia API + PostgreSQL + Redis via .NET Aspire (dashboard em http://localhost:15000)
+dotnet run --project src/PropertyIntelligence.AppHost
+
+# Apenas a API (sem Aspire)
+dotnet watch run --project src/PropertyIntelligence.Api
+
+# Testes
+dotnet test
+
+# Tunnel Cloudflare (acesso externo — não necessário para dev local)
+# CLOUDFLARE_TUNNEL_TOKEN=<token> docker compose -f infra/docker-compose.yml --profile tunnel up -d
 ```
 
 ---
@@ -89,6 +101,17 @@ dotnet test                 # Executar todos os testes
 - [AGENTS.md](AGENTS.md) — Guia para automação e colaboração via agentes de IA
 - [specs/001-property-intelligence-api/plan.md](specs/001-property-intelligence-api/plan.md) — Plano de execução
 - [specs/001-property-intelligence-api/data-model.md](specs/001-property-intelligence-api/data-model.md) — Modelo de dados
+
+---
+
+## Privacidade & LGPD
+
+Esta plataforma trata **endereços** como dados pessoais (Lei nº 13.709/2018 — LGPD).
+Os dados são usados exclusivamente para gerar scores imobiliários e não são
+compartilhados com terceiros além dos provedores listados. Dados não são vendidos.
+Para exercer seus direitos (acesso, correção, exclusão): `privacidade@[domínio]`.
+
+Ver [.specify/memory/constitution.md](.specify/memory/constitution.md) — Princípio VI para as regras técnicas completas.
 
 ---
 

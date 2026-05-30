@@ -29,10 +29,12 @@ Hetzner CX31 (production) → OpenTofu (IaC) → Grafana Cloud via OpenTelemetry
 
 ## Technical Context
 
-**Language/Version**: C# 13 / .NET 10
+**Language/Version**: C# 14 / .NET 10
 
 **Primary Dependencies**:
 - `NRules` 0.9+ — rules engine for dimensional scoring
+- `PropertyIntelligence.Dispatcher` (src — custom CQRS, MIT, sem MediatR) — `ISender`/`IPublisher`/`IPipelineBehavior`
+- `System.Threading.Channels` (.NET built-in) — async domain events via `BackgroundService`
 - `Npgsql` 8 + `Npgsql.NetTopologySuite` — PostgreSQL + PostGIS driver
 - `StackExchange.Redis` 2.8 — Redis cache client
 - `System.Net.Http.Json` — typed HTTP client for OpenRouter (OpenAI-compatible)
@@ -87,8 +89,11 @@ requests/day expected at demo scale
 | III. Test-First | Are tests written before implementation? | ✅ Pass — Tasks phase will enforce red-green-refactor; contract tests defined in contracts/ before implementation |
 | IV. API-First | Contract committed before development? | ✅ Pass — contracts/ generated in this plan phase; endpoint shape locked before coding starts |
 | V. Observability | Structured JSON logs + correlation IDs + health endpoint? | ✅ Pass — FR-008 audit log; AGENTS.md mandates structured logs; health endpoint included in contracts |
+| VI. LGPD & Privacy by Design | Dados pessoais identificados? Privacy note na spec? RIPD previsto? Dados sensíveis protegidos? | ✅ Pass — endereços são dados pessoais (Art. 5º, I); seção Privacy & Compliance adicionada na spec; nenhum dado sensível (Art. 5º, II) é coletado; logs sem dados pessoais em texto claro; pseudonimização mandatória |
 
 **No violations. Proceeding to Phase 0.**
+
+> Constitution v1.1.0 — ratified 2026-05-28, amended 2026-05-30.
 
 ---
 

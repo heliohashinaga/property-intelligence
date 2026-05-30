@@ -101,13 +101,14 @@ Diferencial: scoring multidimensional + explicação gerada por IA + fontes 100%
 ## Constitution
 
 The project constitution lives at `.specify/memory/constitution.md`.
-**Read it before implementing any feature.** The five non-negotiable principles:
+**Read it before implementing any feature.** The six non-negotiable principles:
 
 1. **Domain-First** — Define domain entities in specs before picking tech.
 2. **Data Accuracy & Auditability** — Append-only records; every output is traceable.
 3. **Test-First** — Tests written and failing before implementation begins.
 4. **API-First** — Contracts committed to `specs/` before development starts.
 5. **Observability** — Structured JSON logs + correlation IDs everywhere; no silent failures.
+6. **LGPD & Privacy by Design** — Endereços são dados pessoais; compliance é não-negociável.
 
 ---
 
@@ -115,13 +116,15 @@ The project constitution lives at `.specify/memory/constitution.md`.
 
 | Layer | Technology |
 |---|---|
-| API | .NET 10 Minimal API (C#) |
+| API | .NET 10 Minimal API (C# 14) |
+| Dispatch CQRS | Custom Dispatcher (MIT — sem MediatR; `src/PropertyIntelligence.Dispatcher/`) |
+| Domain Events | `System.Threading.Channels` + `BackgroundService` |
 | Rules Engine | NRules |
 | Database | PostgreSQL + PostGIS |
 | Cache | Redis |
 | AI | OpenRouter (model via `LLM_MODEL` env var — swap without code changes) |
 | Frontend | Vue.js + Chart.js + Leaflet |
-| Dev infra | Docker Compose |
+| Dev infra | .NET Aspire (orquestra API + Postgres + Redis; dashboard :15000) |
 | CI/CD | GitHub Actions |
 | Script runner | `sh` (POSIX shell) |
 
@@ -336,6 +339,14 @@ Specs, plans, contracts, and tasks are committed alongside source code.
   in application code when a PostGIS function covers it.
 - **Infrastructure as code only** — never provision or modify Hetzner/Cloudflare
   resources manually; all changes go through `infra/tofu/`.
+- **No MediatR** — MediatR ≥13 é comercial. Usar o Dispatcher customizado em
+  `src/PropertyIntelligence.Dispatcher/` (MIT, shape-compatible, 4.4× mais rápido).
+- **LGPD — Endereços são dados pessoais** (Lei 13.709/2018):
+  - Dados pessoais **nunca** em logs sem pseudonimização.
+  - Dados sensíveis (Art. 5º, II) descartados antes de qualquer persistência.
+  - Toda feature com novo tratamento de dados pessoais requer RIPD na spec.
+  - Incidentes de segurança notificados à ANPD em até 3 dias úteis.
+  - Ver Constitution Princípio VI para as regras completas.
 
 ---
 

@@ -166,7 +166,16 @@ No backend or API knowledge is required to validate this story.
   implement redundant in-process rate limiting.
 - **FR-007**: System MUST cache enrichment data per source with TTLs
   appropriate to each data source's update frequency (shorter for volatile
-  data like crime, longer for stable data like census figures).
+  data like crime, longer for stable data like census figures). The full
+  analysis result MUST also be cached under a key derived from the
+  **normalized address** (post-ViaCEP/Nominatim, lowercased, whitespace-
+  normalised); raw input variations that resolve to the same normalized
+  address MUST return the same cached result with `"cached": true`.
+  Analysis cache TTL is 24 hours. Authenticated consumers MAY bypass the
+  analysis cache by sending `Cache-Control: no-cache` in the request header;
+  in that case the system MUST re-run the full analysis, persist a new audit
+  record, and return `"cached": false`. Provider-level caches (Redis TTL per
+  source) are NOT bypassed by this header — only the composed analysis cache.
 - **FR-008**: System MUST persist an audit log for every analysis: input
   address, normalized address, all dimensional scores, flags, providers used,
   cache hit/miss status, timestamp, the **LLM model identifier** used to
@@ -174,7 +183,13 @@ No backend or API knowledge is required to validate this story.
   (`rules_version`) active at time of analysis.
 - **FR-009**: System MUST return a normalized address (structured street,
   number, neighborhood, city, state) and geographic coordinates (lat/lng)
-  alongside every successful analysis.
+  alongside every successful analysis. Address normalization MUST use ViaCEP
+  as the primary source; if ViaCEP is unavailable or returns no result, the
+  system MUST automatically retry once against Nominatim (OSM Geocoding API,
+  `nominatim.openstreetmap.org`) before returning HTTP 422. The fallback
+  attempt MUST be transparent to the caller — no change to the response shape.
+  If both sources fail, the system MUST return HTTP 422 with
+  `"error": "address_normalization_failed"` and a PT-BR human-readable message.
 - **FR-010**: System MUST degrade gracefully when individual data providers
   are unavailable: the composite score MUST be the sum of available dimensions
   only; `score.max` MUST reflect the reduced ceiling proportionally (200 × N
@@ -188,12 +203,15 @@ No backend or API knowledge is required to validate this story.
 - **FR-011**: When one or more dimensions are unavailable, the AI-generated
   insight MUST explicitly acknowledge the data gaps (e.g., "A análise de
   segurança não pôde ser realizada por indisponibilidade temporária dos dados.").
-- **FR-012**: Trend direction (improving/stable/worsening) MUST be computed
-  over a per-dimension historical window: `security` and `mobility` MUST use
-  24 months of data; `infrastructure`, `environment`, `appreciation`, and
-  `urban_context` MUST use 36 months. The system MUST store sufficient
-  historical data per dimension to support these windows from the first
-  production import.
+- **FR-012**: Trend direction MUST be computed over a per-dimension historical
+  window: `security` and `mobility` MUST use 24 months of data;
+  `infrastructure`, `environment`, `appreciation`, and `urban_context` MUST
+  use 36 months. The system MUST store sufficient historical data per dimension
+  to support these windows from the first production import. When fewer than
+  3 months of data are available for a dimension, `trend` MUST be set to
+  `"insufficient_data"` instead of `improving`, `stable`, or `worsening`;
+  this value MUST be documented in the API contract and handled explicitly
+  by the frontend.
 
 ### Key Entities
 
@@ -246,13 +264,67 @@ No backend or API knowledge is required to validate this story.
 
 ## Clarifications
 
-### Session 2026-05-28
+### Session 2026-05-30
+
+- Q: Se o ViaCEP estiver indisponível, o que o sistema deve fazer? → A: Tentar fallback para Nominatim (OSM Geocoding) antes de falhar com HTTP 422.
+- Q: Qual é a chave de cache para a análise completa? → A: Endereço normalizado (pós-ViaCEP/Nominatim) — variações de digitação que resolvam para o mesmo endereço retornam o mesmo resultado em cache.
+- Q: Qual deve ser o valor de `trend` quando não há histórico suficiente? → A: `"insufficient_data"` — valor distinto que sinaliza ausência de histórico, distinto de `stable`.
+- Q: O consumidor pode forçar nova análise ignorando o cache? → A: Sim — via header `Cache-Control: no-cache`; apenas o cache da análise composta é ignorado, caches individuais dos providers permanecem.
+- Q: Como o sistema trata tecnicamente requisições LGPD Art. 18 (acesso, exclusão)? → A: Processo manual via e-mail no MVP, sem endpoint dedicado; prazo legal de 15 dias válido; registro em planilha operacional.
 
 - Q: How is the composite score computed when dimension providers are unavailable? → A: Proportional composite — `score` sums only available dimensions; `score.max` reflects the reduced ceiling (200 × N available); grade derived from available-dimension percentage; unavailable dimensions appear with `status: "unavailable"` in `score.dimensions`.
 - Q: What handles rate limiting for API consumers? → A: Cloudflare WAF (edge layer) — rate limiting rules defined in Cloudflare dashboard; API trusts `CF-Connecting-IP`; no in-process quota logic.
 - Q: When is the SSP-SP crime CSV re-imported? → A: Automated monthly scheduled job — downloads latest CSV from SSP-SP and re-imports into PostgreSQL, matching SSP-SP's publication cadence.
 - Q: What is the minimum dimension threshold for HTTP 200 vs 503 on provider failures, and should warnings be shown? → A: Minimum 3 of 6 dimensions required for HTTP 200; below that returns HTTP 503. Response includes a `warnings` array with one PT-BR message per unavailable dimension/provider pair; the AI insight also acknowledges missing dimensions explicitly.
 - Q: What historical window is used to compute dimension trends? → A: Per-dimension — `security` and `mobility` use 24 months (captures recent shifts, filters seasonal noise); `infrastructure`, `environment`, `appreciation`, and `urban_context` use 36 months (aligned with long-term investment horizon).
+
+---
+
+## Privacy & Compliance *(obrigatório — Constitution Princípio VI)*
+
+**Base legal (LGPD Art. 7º, II)**: execução de contrato ou procedimentos preliminares — o titular solicita a análise e fornece o endereço voluntariamente.
+
+### Dados pessoais tratados
+
+| Dado | Categoria (LGPD Art. 5º) | Finalidade | Retenção |
+|---|---|---|---|
+| Endereço submetido | Pessoal (não sensível) | Normalização + geocodificação para gerar score | Até expirar TTL de cache; audit log: indefinido (append-only) |
+| Coordenadas (lat/lng) | Pessoal (localização) | Consultas geoespaciais aos provedores | Mesmo que endereço |
+| IP do consumidor da API | Pessoal | Rate limiting via `CF-Connecting-IP` (Cloudflare) | Não persistido pela aplicação |
+| API Key do consumidor | Pessoal (identificador) | Autenticação e rastreamento de uso | Hash armazenado; chave raw nunca persistida |
+
+### O que este sistema NÃO trata
+
+- Dados sensíveis do Art. 5º, II (origem racial, saúde, biometria, etc.) — proibido.
+  Se qualquer provedor externo retornar dados nessa categoria, eles **devem ser
+  descartados antes de qualquer persistência**.
+- Dados de menores de idade.
+- Dados financeiros do proprietário (IPTU é dado do imóvel, não da pessoa).
+
+### Minimização e Privacy by Design (Art. 46, §2º)
+
+- O endereço submetido é o único dado pessoal de entrada; não é enriquecido
+  com dados do proprietário ou morador.
+- Logs de aplicação usam `address_hash` (SHA-256) em vez do endereço literal.
+- Respostas de erro nunca incluem o endereço submetido no campo `detail`.
+- Provedores externos recebem apenas as informações mínimas necessárias
+  (CEP para ViaCEP; coordenadas para Overpass/ANA — nunca o texto livre original).
+
+### Direitos dos titulares (Art. 18 — resposta em até 15 dias)
+
+O consumidor da API é o controlador dos dados que submete. Esta plataforma atua
+como operadora. Canal de atendimento: `privacidade@[domínio]`. No MVP, todas
+as requisições de acesso, correção e exclusão são processadas **manualmente via
+e-mail** — não há endpoint de self-service. O prazo legal de 15 dias DEVE ser
+respeitado. Registro de requisições e respostas DEVE ser mantido em planilha
+operacional até implementação de sistema dedicado (pós-MVP).
+
+### Avaliação de Impacto (RIPD — Art. 38)
+
+Risco residual classificado como **baixo**: não há tratamento de dados sensíveis,
+não há decisões automatizadas sobre pessoas (o score é do imóvel, não do
+indivíduo), e o volume de dados pessoais é mínimo. RIPD completo disponível
+em `docs/ripd.md` (a ser elaborado antes do lançamento em produção).
 
 ---
 
