@@ -1,0 +1,213 @@
+using System.Diagnostics;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using PropertyIntelligence.Core.Data;
+using PropertyIntelligence.Core.Domain;
+using PropertyIntelligence.Core.Interfaces;
+using PropertyIntelligence.Core.Services;
+
+namespace PropertyIntelligence.Api.Endpoints;
+
+/// <summary>
+/// POST /v1/property/analyze — the main scoring endpoint.
+/// Orchestrates: normalize → enrich → analyze → explain → persist → respond.
+/// </summary>
+public static class AnalyzeEndpoint
+{
+    public static IEndpointRouteBuilder MapAnalyzeEndpoint(this IEndpointRouteBuilder app)
+    {
+        app.MapPost("/v1/property/analyze", HandleAsync)
+           .RequireAuthorization()
+           .WithName("AnalyzeProperty");
+
+        return app;
+    }
+
+    private static async Task<IResult> HandleAsync(
+        AnalyzeRequest          request,
+        HttpContext             ctx,
+        IAddressNormalizer      normalizer,
+        PropertyEnrichmentModule enricher,
+        IPropertyAnalysisEngine engine,
+        IExplainabilityService  llm,
+        PropertyIntelligenceDbContext db,
+        ILogger<AnalyzeEndpointMarker> logger,
+        CancellationToken       ct)
+    {
+        var sw            = Stopwatch.StartNew();
+        var correlationId = ctx.Items["CorrelationId"]?.ToString() ?? Guid.NewGuid().ToString();
+        var apiConsumer   = ctx.Items["ApiConsumer"] as ApiConsumer;
+        var clientIp      = ctx.Items["ClientIp"]?.ToString();
+        var requestStart  = DateTimeOffset.UtcNow;
+
+        // ── 1. Validate ───────────────────────────────────────────────────────
+        if (string.IsNullOrWhiteSpace(request.Address))
+        {
+            return Results.Json(
+                new { error = "validation_error", message = "O campo 'address' é obrigatório.", field = "address" },
+                statusCode: 400);
+        }
+
+        // ── 2. Normalize address ──────────────────────────────────────────────
+        PropertyAddress? address;
+        try
+        {
+            address = await normalizer.NormalizeAsync(request.Address, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Address normalization failed. CorrelationId={CorrelationId} Input={Input}",
+                correlationId, request.Address);
+            address = null;
+        }
+
+        if (address is null)
+        {
+            return Results.Json(
+                new { error = "address_unrecognized", message = "Endereço não reconhecido ou muito ambíguo para análise." },
+                statusCode: 422);
+        }
+
+        // ── 3. Upsert property_addresses ──────────────────────────────────────
+        var existingAddr = await db.PropertyAddresses
+            .FirstOrDefaultAsync(a => a.NormalizedAddress == address.NormalizedAddress, ct);
+
+        if (existingAddr is not null)
+            address = existingAddr;
+        else
+        {
+            db.PropertyAddresses.Add(address);
+            await db.SaveChangesAsync(ct);
+        }
+
+        // ── 4. Enrich (parallel providers) ───────────────────────────────────
+        var profile = await enricher.EnrichAsync(address, correlationId, ct);
+
+        // ── 5. Analyze (NRules engine) ────────────────────────────────────────
+        var consumerId = apiConsumer?.Id ?? Guid.Empty;
+        var analysis   = engine.Analyze(profile, address.Id, consumerId, clientIp);
+
+        // 503 if fewer than 3 dimensions have data
+        var availableCount = analysis.DimensionScores.Count(d => d.Status == DimensionStatus.Available);
+        if (availableCount < 3)
+        {
+            return Results.Json(
+                new
+                {
+                    error   = "insufficient_data",
+                    message = "Dados insuficientes para gerar uma análise confiável. Tente novamente mais tarde.",
+                    providers_unavailable = profile.ProvidersUnavailable,
+                },
+                statusCode: 503);
+        }
+
+        // ── 6. LLM insight (best-effort) ──────────────────────────────────────
+        var insight = await llm.GenerateInsightAsync(analysis, profile, ct);
+
+        // Patch analysis with LLM result and resolved metadata
+        analysis = analysis with
+        {
+            Insight            = insight,
+            InsightUnavailable = insight is null,
+            LlmModel           = ctx.RequestServices
+                                    .GetService<IConfiguration>()
+                                    ?["LLM_MODEL"] ?? "unknown",
+        };
+
+        // ── 7. Persist property_analyses (append-only) ────────────────────────
+        await PersistAnalysisAsync(db, analysis, address.Id, requestStart, ct);
+
+        sw.Stop();
+        logger.LogInformation(
+            "Analysis complete. CorrelationId={CorrelationId} Address={Address} " +
+            "Composite={Composite}/{Max} Grade={Grade} DurationMs={Ms}",
+            correlationId, address.NormalizedAddress,
+            analysis.CompositeScore, analysis.CompositeMax, analysis.Grade, sw.ElapsedMilliseconds);
+
+        // ── 8. Build response ─────────────────────────────────────────────────
+        return Results.Ok(BuildResponse(address, analysis));
+    }
+
+    // ── Persistence ───────────────────────────────────────────────────────────
+
+    private static async Task PersistAnalysisAsync(
+        PropertyIntelligenceDbContext db,
+        PropertyAnalysis analysis,
+        Guid addressId,
+        DateTimeOffset requestStart,
+        CancellationToken ct)
+    {
+        db.PropertyAnalyses.Add(analysis);
+        await db.SaveChangesAsync(ct);
+
+        // Backfill analysis_id on raw logs created during this request
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE data_provider_raw_logs
+               SET analysis_id = {0}
+             WHERE address_id = {1}
+               AND analysis_id IS NULL
+               AND fetched_at >= {2}
+            """,
+            [analysis.Id, addressId, requestStart], ct);
+    }
+
+    // ── Response mapping ──────────────────────────────────────────────────────
+
+    private static object BuildResponse(PropertyAddress address, PropertyAnalysis analysis)
+    {
+        return new
+        {
+            address = new
+            {
+                normalized   = address.NormalizedAddress,
+                street       = address.StreetName,
+                number       = address.StreetNumber,
+                neighborhood = address.Neighborhood,
+                city         = address.City,
+                state        = address.State,
+                postal_code  = address.PostalCode,
+                coordinates  = address.Lat.HasValue ? new { latitude = address.Lat, longitude = address.Lng } : null,
+            },
+            score = new
+            {
+                composite = analysis.CompositeScore,
+                max       = analysis.CompositeMax,
+                grade     = analysis.Grade,
+                dimensions = analysis.DimensionScores.ToDictionary(
+                    d => d.Dimension,
+                    d => (object)new
+                    {
+                        score  = d.Score,
+                        max    = d.Max,
+                        trend  = d.Trend?.ToString().ToLowerInvariant(),
+                        status = d.Status.ToString().ToLowerInvariant(),
+                    }),
+            },
+            risk_flags        = analysis.RiskFlags,
+            opportunity_flags = analysis.OpportunityFlags,
+            insight           = analysis.Insight,
+            insight_unavailable = analysis.InsightUnavailable,
+            warnings = analysis.Warnings.Select(w => new
+            {
+                code      = w.Code,
+                dimension = w.Dimension,
+                message   = w.Message,
+            }),
+            providers_used        = analysis.ProvidersUsed,
+            providers_unavailable = analysis.ProvidersUnavailable,
+            cached                = analysis.Cached,
+            analysis_id           = analysis.Id,
+            analyzed_at           = analysis.CreatedAt,
+        };
+    }
+}
+
+/// <summary>Marker type for ILogger injection (avoids generic open-type issues).</summary>
+public sealed class AnalyzeEndpointMarker { }
+
+/// <summary>Request DTO for POST /v1/property/analyze.</summary>
+public sealed record AnalyzeRequest(string? Address);
