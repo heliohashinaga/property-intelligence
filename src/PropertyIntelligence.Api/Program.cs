@@ -89,6 +89,11 @@ var redisConnStr = builder.Configuration.GetConnectionString("redis")
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(redisConnStr));
 
+// ── .NET 10 features ───────────────────────────────────────────────────────────
+builder.Services.AddOpenApi();           // Native OpenAPI 3.1 document generation
+builder.Services.AddValidation();        // Data Annotations validation on Minimal API DTOs
+builder.Services.AddSingleton(TimeProvider.System); // Testable time abstraction
+
 // ── Application services (T039) ──────────────────────────────────────────────
 builder.Services.AddSingleton<ICacheService, CacheService>();
 builder.Services.AddScoped<IAddressNormalizer, AddressNormalizerService>();
@@ -335,6 +340,7 @@ app.Use(async (context, next) =>
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 
 // ── Endpoints ────────────────────────────────────────────────────────────────
+app.MapOpenApi();            // GET /openapi/v1.json — OpenAPI 3.1 nativo
 app.MapHealthEndpoint();
 app.MapAnalyzeEndpoint();
 

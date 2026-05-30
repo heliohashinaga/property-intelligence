@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -20,7 +21,15 @@ public static partial class AnalyzeEndpoint
     {
         app.MapPost("/v1/property/analyze", HandleAsync)
            .RequireAuthorization()
-           .WithName("AnalyzeProperty");
+           .WithName("AnalyzeProperty")
+           .WithOpenApi()
+           .WithSummary("Analyze a Brazilian property address")
+           .WithDescription("Scores a property across 6 dimensions (security, mobility, infrastructure, environment, appreciation, urban_context) using public data sources and generates a PT-BR AI insight.")
+           .Produces(200)
+           .Produces(400)
+           .Produces(401)
+           .Produces(422)
+           .Produces(503);
 
         return app;
     }
@@ -33,6 +42,7 @@ public static partial class AnalyzeEndpoint
         IPropertyAnalysisEngine engine,
         IExplainabilityService  llm,
         PropertyIntelligenceDbContext db,
+        TimeProvider            timeProvider,
         ILogger<AnalyzeEndpointMarker> logger,
         CancellationToken       ct)
     {
@@ -40,17 +50,9 @@ public static partial class AnalyzeEndpoint
         var correlationId = ctx.Items["CorrelationId"]?.ToString() ?? Guid.NewGuid().ToString();
         var apiConsumer   = ctx.Items["ApiConsumer"] as ApiConsumer;
         var clientIp      = ctx.Items["ClientIp"]?.ToString();
-        var requestStart  = DateTimeOffset.UtcNow;
+        var requestStart  = timeProvider.GetUtcNow();
 
-        // ── 1. Validate ───────────────────────────────────────────────────────
-        if (string.IsNullOrWhiteSpace(request.Address))
-        {
-            return Results.Json(
-                new { error = "validation_error", message = "The 'address' field is required.", field = "address" },
-                statusCode: 400);
-        }
-
-        // ── 2. Normalize address ──────────────────────────────────────────────
+        // ── 1. Normalize address ──────────────────────────────────────────────
         PropertyAddress? address;
         try
         {
@@ -140,15 +142,13 @@ public static partial class AnalyzeEndpoint
         await db.SaveChangesAsync(ct);
 
         // Backfill analysis_id on raw logs created during this request
-        await db.Database.ExecuteSqlRawAsync(
-            """
-            UPDATE data_provider_raw_logs
-               SET analysis_id = {0}
-             WHERE address_id = {1}
-               AND analysis_id IS NULL
-               AND fetched_at >= {2}
-            """,
-            [analysis.Id, addressId, requestStart], ct);
+        // EF Core 10: type-safe ExecuteUpdateAsync replaces raw SQL
+        await db.DataProviderRawLogs
+            .Where(l => l.AddressId == addressId
+                     && l.AnalysisId == null
+                     && l.FetchedAt >= requestStart)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(l => l.AnalysisId, analysis.Id), ct);
     }
 
     // ── Response mapping ──────────────────────────────────────────────────────
@@ -221,4 +221,6 @@ public static partial class AnalyzeEndpoint
 public sealed class AnalyzeEndpointMarker { }
 
 /// <summary>Request DTO for POST /v1/property/analyze.</summary>
-public sealed record AnalyzeRequest(string? Address);
+public sealed record AnalyzeRequest(
+    [Required][StringLength(500, MinimumLength = 3)]
+    string Address);
