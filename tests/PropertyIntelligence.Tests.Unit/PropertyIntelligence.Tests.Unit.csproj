@@ -24,6 +24,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PropertyIntelligence.Core\PropertyIntelligence.Core.csproj" />
     <ProjectReference Include="..\..\src\PropertyIntelligence.Rules\PropertyIntelligence.Rules.csproj" />
+    <ProjectReference Include="..\..\src\PropertyIntelligence.Api\PropertyIntelligence.Api.csproj" />
+    <ProjectReference Include="..\..\src\PropertyIntelligence.Providers\PropertyIntelligence.Providers.csproj" />
   </ItemGroup>
 
 </Project>

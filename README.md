@@ -95,6 +95,38 @@ dotnet test
 
 ---
 
+## Benchmark & Performance (T082)
+
+Para medir a latência p95/p99 e throughput da API (`/v1/property/analyze`), use o script automatizado com [oha](https://github.com/hatoo/oha):
+
+### Instalação recomendada (via cargo – oficial):
+```sh
+cargo install oha
+```
+(Necessário ter [Rust/cargo](https://rustup.rs/) instalado.)
+
+**Alternativamente (binário Linux):**
+```sh
+curl -L https://github.com/hatoo/oha/releases/latest/download/oha-linux-amd64 -o oha
+chmod +x oha; sudo mv oha /usr/local/bin/
+```
+Para MacOS: `brew install oha`. Para Windows: `scoop install oha` ou [releases](https://github.com/hatoo/oha/releases).
+
+### Como rodar benchmark
+
+```sh
+cp .env.example .env             # configure seu API_KEY no arquivo .env local!
+export API_KEY=suatoken123       # nunca exponha sua chave no shell/histórico público
+./data/benchmark/smoke.sh        # endpoint e payload já configurados para o padrão local
+```
+- Executa 20 requisições frias (sem cache) e 20 quentes (com cache)
+- Mostra latência p95/p99, distribuição de status/erros, throughput
+- Parâmetros customizáveis: `REQS=100 CONC=10 ./data/benchmark/smoke.sh`
+
+**Sempre utilize variável de ambiente (`API_KEY`) para segurança máxima (jamais em argumento de linha de comando).**
+
+---
+
 ## Documentação detalhada
 
 - [specs/001-property-intelligence-api/spec.md](specs/001-property-intelligence-api/spec.md) — Especificação

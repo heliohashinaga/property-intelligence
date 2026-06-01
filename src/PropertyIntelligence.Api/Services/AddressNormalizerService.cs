@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using PropertyIntelligence.Api.Logging;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
-using PropertyIntelligence.Providers.ViaCep;
 
 namespace PropertyIntelligence.Api.Services;
 
@@ -22,12 +21,12 @@ public sealed partial class AddressNormalizerService : IAddressNormalizer
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly ViaCepProvider                   _viaCep;
+    private readonly IDataProvider<PropertyAddress>    _viaCep;
     private readonly IHttpClientFactory               _http;
     private readonly ILogger<AddressNormalizerService> _logger;
 
     public AddressNormalizerService(
-        ViaCepProvider                    viaCep,
+        IDataProvider<PropertyAddress>    viaCep,
         IHttpClientFactory                http,
         ILogger<AddressNormalizerService> logger)
     {
