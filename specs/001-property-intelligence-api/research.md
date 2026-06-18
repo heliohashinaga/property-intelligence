@@ -91,8 +91,9 @@ in real-time; only flood/census are local PostGIS data).
 ## 3. IDataProvider\<T\> — Parallel Orchestration Pattern
 
 **Decision**: `Task.WhenAll` with per-provider `CancellationToken` timeout
-(5s per provider); capture exceptions individually; mark failed providers as
-unavailable rather than bubbling exceptions.
+(5s per provider by default, overridable via provider registry metadata);
+capture exceptions individually; mark failed providers as unavailable rather
+than bubbling exceptions.
 
 ```csharp
 public async Task<PropertyProfile> EnrichAsync(PropertyAddress address, CancellationToken ct)
@@ -110,14 +111,41 @@ public async Task<PropertyProfile> EnrichAsync(PropertyAddress address, Cancella
 }
 ```
 
-**Cache key**: `{ProviderName}:{SHA256(normalizedAddress)[..16]}` stored in Redis.
+**Cache key**: `{provider_id}:{SHA256(normalizedAddress)[..16]}` stored in Redis.
+TTL and timeout should come from provider registry metadata, not from a
+hardcoded provider switch.
+
+### 3.1 Address Normalization & Geocoding — Prefer Public/Local Sources
+
+**Decision**: Use a layered strategy:
+1. `ViaCEP` for CEP normalization and canonical address fields.
+2. `IBGE Localidades API` for municipality/state validation.
+3. For coordinate resolution, prefer **local/open datasets** for São Paulo
+   (CNEFE/geocodebr, GeoSampa lote/logradouro layers when sufficient) and use
+   public Nominatim only as a low-volume fallback during MVP experimentation.
+
+**Rationale**: ViaCEP is free and simple for address normalization, but the
+public Nominatim service is explicitly rate-limited and not a good long-term
+production dependency for bulk or frequent geocoding. For a São Paulo-focused
+MVP, local/open address bases are more sustainable and easier to swap.
+
+**Free/public sources preferred**:
+- `https://viacep.com.br/` — free CEP normalization
+- `https://servicodados.ibge.gov.br/api/docs/localidades` — official locality validation
+- `https://ipea.github.io/geocodebr/` — open geocoding over CNEFE/open address bases
+- `https://www.gov.br/conecta/catalogo/apis/cep-codigo-de-enderecamento-postal` — government CEP/address API catalog entry (evaluate access friction before adopting)
+
+**Operational note**: Do **not** rely on the public `nominatim.openstreetmap.org`
+instance for sustained production traffic; OSM policy limits heavy/bulk use and
+recommends self-hosting or alternative sources for power users.
 
 ---
 
-## 4. Overpass API — POI Radius Queries
+## 4. Mobility Data — Official SP Sources First, Overpass as Fallback
 
-**Decision**: Query Overpass Turbo API with QL (Overpass Query Language) for
-each address. Cache per provider TTL = 7 days.
+**Decision**: For São Paulo, prefer official/open transport datasets first
+(SPTrans + GeoSampa + Metrô/CPTM layers) and keep Overpass/OSM as a secondary
+fallback/supplementary provider. Cache per provider TTL = 7 days.
 
 **Query pattern** (metrô within 500m):
 ```
@@ -129,14 +157,21 @@ each address. Cache per provider TTL = 7 days.
 out count;
 ```
 
-**Endpoint**: `https://overpass-api.de/api/interpreter` (public instance) or
-self-host for production. For MVP, public instance is sufficient.
+**Official/free sources preferred for São Paulo**:
+- SPTrans developer/data portal and GTFS/open stop datasets
+- GeoSampa transport layers (`pontos de ônibus`, `linhas de ônibus`, Metrô/CPTM station layers, project station layers)
+- Metrô/CPTM layers exposed through GeoSampa metadata/WFS/WMS when available
+
+**Overpass endpoint**: `https://overpass-api.de/api/interpreter` (public instance)
+for MVP fallback/prototyping; for heavier usage prefer self-hosting or move more
+queries to official local datasets.
 
 **Radii used**: 500m (walking), 1km (short bike), 2km (transit catchment).
-Query three radii in one Overpass request using union.
+When using Overpass, query three radii in one request using union.
 
 **Alternatives considered**: Google Places API (paid, unnecessary), HERE Maps
-(paid), Foursquare (rate limits). OSM via Overpass is free and sufficient.
+(paid), Foursquare (rate limits). Compared with pure Overpass, São Paulo's own
+open transport datasets are easier to govern, easier to test, and less fragile.
 
 ---
 
@@ -184,11 +219,12 @@ PostgreSQL `census_sectors` table with PostGIS geometry.
 
 ---
 
-## 7. SSP-SP Crime Data — Monthly CSV Import
+## 7. SSP-SP Crime Data — Monthly Official Import
 
-**Decision**: Automated monthly job (cron) downloads latest CSV from
-`https://www.ssp.sp.gov.br/estatistica/` → inserts into `crime_records` table.
-Existing records never updated — new month appended.
+**Decision**: Automated monthly job (cron) downloads the latest official crime
+dataset from SSP-SP / Dados Abertos SP (`estatistica`, `transparenciassp`, or
+`Números sem Mistério`, whichever remains the most stable official distribution)
+→ inserts into `crime_records` table. Existing records never updated — new month appended.
 
 **CSV structure** (SSP-SP standard columns):
 ```
@@ -209,9 +245,11 @@ negative = improving, near-zero = stable (threshold: ±5% per year).
 
 ## 8. INEP IDEB — School Quality Data
 
-**Decision**: Download INEP IDEB results XLS (public download) → convert to CSV
-→ import into `school_records` table with lat/lng from geocoding school address
-(via ViaCEP + Nominatim for initial batch geocode).
+**Decision**: Download INEP IDEB results XLS/CSV (public download) → convert to CSV
+→ import into `school_records` table. Prefer official latitude/longitude fields
+when present. For missing coordinates, use a local/open geocoding workflow
+(`geocodebr`/CNEFE or municipal address bases) instead of bulk use of the public
+Nominatim service.
 
 **IDEB fields used**: `NO_ESCOLA`, `NU_LATITUDE`, `NU_LONGITUDE`, `VL_OBSERVADO`
 (IDEB score), `NU_ANO_SAEB` (reference year), `TP_DEPENDENCIA` (public/private).
@@ -224,7 +262,8 @@ new results published.
 ## 9. CNES / DataSUS — Health Facilities
 
 **Decision**: Download CNES (Cadastro Nacional de Estabelecimentos de Saúde)
-CSV from DataSUS → import into `health_facilities` table with lat/lng.
+CSV from DataSUS or Dados Abertos → import into `health_facilities` table with
+lat/lng. Prefer HTTPS/open-data mirrors when operationally simpler than legacy FTP.
 
 **Source**: `ftp.datasus.gov.br/dissemin/publicos/CNES/` (FTP) or
 `https://dados.gov.br/dados/conjuntos-dados/` (HTTPS). Monthly update cadence.
@@ -261,10 +300,11 @@ cloudflared:
 ## 11. Redis TTL Caching Strategy
 
 **Decision**: `StackExchange.Redis` with `IDatabase.SetAsync(key, value, ttl)`.
-Cache key format: `{provider}:{addressHash}` where addressHash is first 16 chars
+Cache key format: `{provider_id}:{addressHash}` where addressHash is first 16 chars
 of SHA-256 of the normalized address string (lowercase, trimmed).
 
-**TTL table** (from spec clarifications):
+**TTL policy**: resolve TTL from provider registry metadata instead of a
+hardcoded table in code. The MVP seed values can start as:
 
 | Provider | TTL |
 |---|---|
@@ -275,7 +315,8 @@ of SHA-256 of the normalized address string (lowercase, trimmed).
 | ssp_sp | 24 hours |
 | cnes | 7 days |
 | inep | 30 days |
-| iptu_api | 30 days |
+| geosampa_zoneamento | 30 days |
+| geosampa_iptu | 30 days |
 
 **Cache miss → fetch → store → return** is the standard read-through pattern.
 Cache hit → deserialize → return with `cached: true`.
@@ -351,8 +392,8 @@ do NOT fail the entire request.
 
 **Decision**: Add `PropertyIntelligence.AppHost` project (Aspire AppHost) that orchestrates
 all .NET projects locally with service discovery, health dashboard, and
-OpenTelemetry built-in. Docker Compose remains for infrastructure services
-(PostgreSQL, Redis, Cloudflared).
+OpenTelemetry built-in. Docker Compose is kept only as an optional path for
+infrastructure services (PostgreSQL, Redis, Cloudflared).
 
 **Rationale**: Aspire eliminates manual URL configuration between services,
 provides a live dashboard (traces, metrics, logs) during development, and emits
@@ -467,15 +508,25 @@ integration tests are the primary correctness signal for spatial queries.
 
 ---
 
-## 14. IPTU API Integration
+## 14. Appreciation / Zoning Data — Prefer Official Public Sources
 
-**Decision**: Call IPTU API free tier (`https://www.iptuapi.com.br`) with
-API key. Returns property fiscal value, zoning class, and historical IPTU values.
-Cache 30 days (fiscal data rarely changes mid-year).
+**Decision**: Prefer official/open municipal sources for `appreciation` inputs,
+especially GeoSampa / Prefeitura de São Paulo / URBIS datasets, instead of a
+commercial IPTU wrapper API.
 
-**Appreciation trend calculation**: Compare IPTU valor venal across available
-years (typically 3–5 years of history available) → compute CAGR → positive
-CAGR = improving, negative = worsening.
+**Preferred free/public sources**:
+- GeoSampa / PMSP IPTU cadastral datasets and metadata
+- GeoSampa zoning layers (`Mapa 01 - Perímetros das Zonas`, SISZON, lote/setor/quadra layers)
+- URBIS / PMSP land-use and development datasets
+- PDE / legislação urbana open datasets
+- Future transit project layers from GeoSampa/Metrô for appreciation proxies
 
-**Free tier limits**: 500 requests/month. For MVP scale this is sufficient;
-cache aggressively.
+**Rationale**: Although `iptuapi.com.br` has a small free tier, it is still a
+third-party commercial dependency. If the goal is easy add/remove and maximum
+free/public provenance, municipal open data is a better fit.
+
+**Scoring strategy adjustment**: For MVP, `appreciation` can be derived from
+public proxies such as zoning permissiveness, proximity to confirmed future
+transit, urban projects, and fiscal/cadastral data available from the city. If
+historical valor venal is incomplete, prefer a simpler official-data score over
+introducing a paid/closed dependency.

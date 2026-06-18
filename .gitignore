@@ -58,3 +58,5 @@ nunit-*.xml
 
 # PI
 .pi/
+
+data/import/raw/ana/

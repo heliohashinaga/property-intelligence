@@ -2,6 +2,8 @@
 # ANA SNIRH Flood Risk Zones Import
 # Imports flood-risk zone polygons from an ANA shapefile into the flood_risk_zones table.
 #
+# Site: https://metadados.snirh.gov.br/geonetwork/srv/por/catalog.search#/search?any=alagamentos
+#
 # Usage:
 #   sh data/import/ana_shapefile_import.sh /path/to/flood_risk.shp
 #   ANA_SHAPEFILE=/path/to/flood_risk.shp sh data/import/ana_shapefile_import.sh
@@ -9,29 +11,48 @@
 # Requirements:
 #   - ogr2ogr (gdal-bin)
 #   - psql (postgresql-client)
-#   - DATABASE_URL env var pointing to the PostGIS database
+#   - DATABASE_URL env var pointing to the PostGIS database (defaults to the
+#     local Aspire database when not provided)
 #
 # The script is idempotent: rows are inserted with ON CONFLICT DO NOTHING,
 # so re-running after a partial import is safe.
 
 set -e
 
-SHAPEFILE="${1:-${ANA_SHAPEFILE:-}}"
-
-if [ -z "$SHAPEFILE" ]; then
-    echo "ERROR: shapefile path required." >&2
-    echo "Usage: $0 <path-to-shapefile.shp>" >&2
-    echo "  or:  ANA_SHAPEFILE=/path/to/file.shp $0" >&2
-    exit 1
-fi
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
+DEFAULT_SHAPEFILE="$REPO_ROOT/data/import/raw/ana/SNIRH_Inundacao.shp"
+SHAPEFILE="${1:-${ANA_SHAPEFILE:-$DEFAULT_SHAPEFILE}}"
 
 if [ ! -f "$SHAPEFILE" ]; then
-    echo "ERROR: file not found: $SHAPEFILE" >&2
+    echo "ERROR: shapefile not found: $SHAPEFILE" >&2
+    echo "Usage: $0 <path-to-shapefile.shp>" >&2
+    echo "  or:  ANA_SHAPEFILE=/path/to/file.shp $0" >&2
+    echo "  or:  $0   # defaults to $DEFAULT_SHAPEFILE" >&2
     exit 1
 fi
 
-if [ -z "$DATABASE_URL" ]; then
-    echo "ERROR: DATABASE_URL is required." >&2
+for companion in \
+    "${SHAPEFILE%.shp}.dbf" \
+    "${SHAPEFILE%.shp}.prj" \
+    "${SHAPEFILE%.shp}.shx"
+do
+    if [ ! -f "$companion" ]; then
+        echo "ERROR: required shapefile companion missing: $companion" >&2
+        exit 1
+    fi
+done
+
+DEFAULT_DATABASE_URL="host=localhost port=5432 dbname=property-intelligence user=property_intelligence password=property_intelligence"
+DATABASE_URL="${DATABASE_URL:-$DEFAULT_DATABASE_URL}"
+
+if ! command -v ogr2ogr >/dev/null 2>&1; then
+    echo "ERROR: ogr2ogr not found. Install gdal-bin." >&2
+    exit 1
+fi
+
+if ! command -v psql >/dev/null 2>&1; then
+    echo "ERROR: psql not found. Install postgresql-client." >&2
     exit 1
 fi
 

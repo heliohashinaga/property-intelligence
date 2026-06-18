@@ -9,6 +9,10 @@
 
 ---
 
+## Pré-requisitos
+
+- .NET 10 SDK instalado (`dotnet --version` deve retornar `10.x`)
+
 ## Como funciona
 
 - **Entrada**: endereço livre (ex: "Rua Augusta, 1500, São Paulo")
@@ -68,7 +72,7 @@
 - Cache: Redis
 - IA: Claude API (insight PT-BR)
 - Frontend: Vue.js, Chart.js, Leaflet
-- Infra: Docker Compose, K8s
+- Infra: .NET Aspire, K8s
 - CI/CD: GitHub Actions
 
 ---
@@ -76,8 +80,10 @@
 ## Execução Local
 
 ```sh
-docker compose up -d        # Banco, Redis, tunel
-dotnet run --project src/PropertyIntelligence.Api   # API
+# Orquestração local com Aspire
+dotnet run --project src/PropertyIntelligence.AppHost   # AppHost do Aspire
+# Dashboard: http://localhost:15000
+
 dotnet test                 # Executar todos os testes
 ```
 

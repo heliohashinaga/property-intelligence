@@ -35,7 +35,12 @@
 
 ## Responses
 
-### 200 OK — Full Analysis (all providers available)
+**Provider-set note**: `providers_used` and `providers_unavailable` are dynamic
+arrays derived from the currently enabled provider registry. The examples below
+use the initial MVP registry, but clients MUST treat these arrays as variable
+subsets rather than a fixed contractually frozen list.
+
+### 200 OK — Full Analysis (all enabled providers available)
 
 ```json
 {
@@ -110,10 +115,11 @@
 
 ---
 
-### 200 OK — Partial Analysis (some providers unavailable)
+### 200 OK — Partial Analysis (some enabled providers unavailable)
 
 When 3–5 of 6 dimensions have data. `score.max` reflects the reduced ceiling.
-Grade derived from `composite / max` percentage.
+Grade derived from `composite / max` percentage. Disabled providers are omitted
+from both arrays and do not count as unavailable.
 
 ```json
 {

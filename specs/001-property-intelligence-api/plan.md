@@ -13,11 +13,12 @@ This project adopts a definitive multi-agent implementation strategy: all major 
 Property Intelligence is a REST API that accepts a free-text Brazilian address and returns a
 multidimensional property risk/opportunity score (0–1000) across 6 dimensions,
 with AI-generated natural language explanation in PT-BR. The system orchestrates
-8 heterogeneous data providers (public APIs + locally-imported datasets) in
-parallel via a typed `IDataProvider<T>` abstraction, computes dimensional scores
-with NRules, and generates insights via OpenRouter (LLM gateway → Claude Haiku
-or Gemini Flash, model-agnostic). A Vue.js frontend demo renders the radar chart
-and score visually.
+an extensible, registry-driven set of data sources (public APIs + locally-imported
+datasets) in parallel via a typed `IDataProvider<T>` abstraction, computes
+dimensional scores with NRules, and generates insights via OpenRouter (LLM
+gateway → Claude Haiku or Gemini Flash, model-agnostic). The initial release
+ships with 8 providers, but the architecture must not assume that provider count
+is fixed. A Vue.js frontend demo renders the radar chart and score visually.
 
 Technical approach: .NET 10 Minimal API + .NET Aspire (local dev orchestration)
 → PostgreSQL + PostGIS (geospatial data + audit logs) → Redis (provider-level
@@ -50,7 +51,7 @@ Hetzner CX31 (production) → OpenTofu (IaC) → Grafana Cloud via OpenTelemetry
 **Testing**: xUnit 2.x, Testcontainers.PostgreSql, Testcontainers.Redis,
 WireMock.Net, FluentAssertions
 
-**Target Platform**: Linux; local dev via .NET Aspire + Docker Compose; production on K3s (K3s v1.30) single-node cluster on Hetzner CX31 (4 vCPU, 8GB RAM, Ubuntu 24.04); exposed via Cloudflare Tunnel (cloudflared)
+**Target Platform**: Linux; local dev via .NET Aspire, with Docker Compose kept as an optional path for infrastructure services; production on K3s (K3s v1.30) single-node cluster on Hetzner CX31 (4 vCPU, 8GB RAM, Ubuntu 24.04); exposed via Cloudflare Tunnel (cloudflared)
 
 **Project Type**: Web service (REST API) + Vue.js frontend demo
 
@@ -61,6 +62,7 @@ WireMock.Net, FluentAssertions
 
 **Constraints**:
 - All MVP data sources are free/public; no paid API dependency at launch
+- Provider activation/deactivation MUST be configuration-driven via a registry/catalog; adding or removing a source must not require API contract or scoring-engine rewrites
 - Records are append-only (PropertyAnalysis table); no UPDATE/DELETE on audit rows
 - Raw provider payloads stored before transformation (DataProviderRawLog table)
 - Rate limiting delegated to Cloudflare WAF; API trusts `CF-Connecting-IP`
@@ -73,6 +75,25 @@ WireMock.Net, FluentAssertions
 
 **Scale/Scope**: Portfolio project; initial target São Paulo (SP); ~hundreds of
 requests/day expected at demo scale
+
+---
+
+## Provider Extensibility Model
+
+The provider layer is designed as a **declarative registry of data sources**, not
+as a permanently fixed list of concrete adapters.
+
+- A **provider registry** defines `provider_id`, display name, enabled state,
+  supported capabilities/dimensions, timeout, cache TTL, source type (`real_time`,
+  `imported`, `local_db`), and version metadata.
+- `PropertyEnrichmentModule` orchestrates **only enabled registry entries**.
+  Disabled providers are skipped before fan-out.
+- Adding a new source means: implement an adapter, register its metadata, and add
+  tests. Removing a source means disabling or deleting its registry entry.
+- The API contract remains stable as long as the six scoring dimensions remain the
+  same; provider churn must not require endpoint schema churn.
+- Cache keys and TTL policy are derived from registry metadata, not from a fixed
+  hardcoded provider list.
 
 ---
 
@@ -139,6 +160,10 @@ src/
 │       └── PropertyEnrichmentModule.cs
 │
 ├── PropertyIntelligence.Providers/
+│   ├── Registry/
+│   │   ├── ProviderCatalogOptions.cs
+│   │   ├── ProviderDescriptor.cs
+│   │   └── ProviderRegistry.cs
 │   ├── ViaCep/ViaCepProvider.cs
 │   ├── Overpass/OverpassPoiProvider.cs
 │   ├── Ana/AnaFloodRiskProvider.cs
@@ -229,11 +254,13 @@ data/
 
 **Structure Decision**: Web application pattern (backend API + Vue frontend).
 Backend split into 6 projects: Api (thin endpoint layer), Core (domain +
-interfaces), Providers (8 provider implementations), Rules (NRules scoring),
+interfaces), Providers (registry + source adapters), Rules (NRules scoring),
 Explainability (OpenRouter LLM integration), AppHost (.NET Aspire local
 orchestrator). Separation enforces the Domain-First principle and makes each
-provider independently testable. Production deployment managed by K3s manifests
-under `infra/k3s/`, provisioned via OpenTofu in `infra/tofu/`.
+provider independently testable while keeping source activation/removal a
+configuration concern instead of an API/scoring concern. Production deployment
+managed by K3s manifests under `infra/k3s/`, provisioned via OpenTofu in
+`infra/tofu/`.
 
 ---
 

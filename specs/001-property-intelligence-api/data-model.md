@@ -51,8 +51,8 @@ Append-only audit record of every completed analysis. Never updated or deleted.
 | `llm_model` | `varchar(100)` | NOT NULL | OpenRouter model used, e.g. `anthropic/claude-3-haiku` |
 | `rules_version` | `varchar(20)` | NOT NULL | NRules scoring version tag, e.g. `1.0.0` |
 | `warnings` | `jsonb` | NOT NULL, default '[]' | Array of AnalysisWarning objects |
-| `providers_used` | `text[]` | NOT NULL | |
-| `providers_unavailable` | `text[]` | NOT NULL, default '{}' | |
+| `providers_used` | `text[]` | NOT NULL | Provider IDs successfully consulted from the enabled registry |
+| `providers_unavailable` | `text[]` | NOT NULL, default '{}' | Enabled provider IDs that failed during this analysis |
 | `cached` | `boolean` | NOT NULL | Were all providers served from cache? |
 | `request_ip` | `inet` | | CF-Connecting-IP |
 | `created_at` | `timestamptz` | NOT NULL, default now() | |
@@ -77,6 +77,30 @@ One row per registered API key. Key is stored hashed (SHA-256).
 
 ---
 
+### `provider_catalog`
+
+Declarative registry of available data sources. This table can be seeded from
+configuration at deploy/startup time and is the source of truth for which
+providers are enabled.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `provider_id` | `text` | PK | Stable identifier, e.g. `viacep`, `ssp_sp` |
+| `display_name` | `text` | NOT NULL | Human-friendly source name |
+| `enabled` | `boolean` | NOT NULL, default true | Disable without code changes |
+| `capabilities` | `text[]` | NOT NULL | Supported dimensions/capabilities |
+| `cache_ttl_seconds` | `integer` | NOT NULL | Runtime cache TTL |
+| `timeout_seconds` | `integer` | NOT NULL | Per-provider timeout budget |
+| `source_type` | `text` | NOT NULL | `real_time`, `imported`, `local_db` |
+| `version` | `text` | NOT NULL | Adapter/source version for auditability |
+| `created_at` | `timestamptz` | NOT NULL, default now() | |
+| `updated_at` | `timestamptz` | NOT NULL, default now() | |
+| `last_healthcheck_at` | `timestamptz` | nullable | Optional operational visibility |
+
+**Indexes**: `(enabled)`, GIN on `(capabilities)` if query patterns justify it.
+
+---
+
 ### `data_provider_raw_logs`
 
 Stores raw external provider payloads before transformation. Supports
@@ -86,7 +110,8 @@ auditability and re-processing without re-fetching. Append-only.
 |---|---|---|---|
 | `id` | `uuid` | PK, default gen_random_uuid() | |
 | `analysis_id` | `uuid` | nullable, FK → property_analyses | null if fetch happens before analysis ID is assigned |
-| `provider_name` | `text` | NOT NULL | e.g., "overpass", "ssp_sp" |
+| `provider_id` | `text` | NOT NULL, FK → provider_catalog.provider_id | Stable source identifier |
+| `provider_version` | `text` | NOT NULL | Captured from registry at fetch time |
 | `address_id` | `uuid` | NOT NULL, FK → property_addresses | |
 | `raw_payload` | `jsonb` | NOT NULL | Serialized raw response |
 | `fetched_at` | `timestamptz` | NOT NULL, default now() | |
@@ -258,19 +283,16 @@ so partial analyses are graded fairly.
 
 ## Redis Cache Schema
 
-Keys follow the pattern: `{provider}:{addressHash}` where `addressHash` is
+Keys follow the pattern: `{provider_id}:{addressHash}` where `addressHash` is
 the first 16 hex characters of `SHA256(normalized_address.ToLowerInvariant())`.
 
-| Key pattern | TTL | Value |
+TTL is resolved from `provider_catalog.cache_ttl_seconds`, not from a hardcoded
+switch statement or fixed provider table.
+
+| Key pattern | TTL source | Value |
 |---|---|---|
-| `viacep:{hash}` | 30d | JSON ViaCEP response |
-| `overpass:{hash}` | 7d | JSON POI counts by radius |
-| `ana:{hash}` | 30d | JSON flood risk result |
-| `ibge:{hash}` | 30d | JSON census sector data |
-| `ssp_sp:{hash}` | 24h | JSON crime rate + trend |
-| `cnes:{hash}` | 7d | JSON health facility counts |
-| `inep:{hash}` | 30d | JSON nearest school IDEB |
-| `iptu:{hash}` | 30d | JSON IPTU valuation data |
+| `{provider_id}:{hash}` | `provider_catalog.cache_ttl_seconds` | Serialized raw or normalized provider result |
+| `{provider_id}:{hash}:meta` | `provider_catalog.cache_ttl_seconds` | Optional metadata snapshot (version, fetched_at, trend inputs) |
 
 ---
 
@@ -280,9 +302,13 @@ the first 16 hex characters of `SHA256(normalized_address.ToLowerInvariant())`.
 api_consumers ──┐
                 ├── property_analyses ──── property_addresses
                 │         │
-                │         └── data_provider_raw_logs
+                │         └── data_provider_raw_logs ──── provider_catalog
                 │
-                └── (future: usage_logs, quotas)
+provider_catalog ────────────────────────────────────────┘
+                │
+                └── (future: provider health snapshots, rollout policies)
+
+api_consumers ── (future: usage_logs, quotas)
 
 property_analyses.dimension_scores → DimensionScore[] (JSONB)
 property_analyses.warnings         → AnalysisWarning[] (JSONB)
