@@ -1,0 +1,72 @@
+[
+  {
+    "provider_id": "mock_address",
+    "display_name": "Mock Address Provider",
+    "enabled": true,
+    "capabilities": ["address"],
+    "cache_ttl_seconds": 2592000,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_mobility",
+    "display_name": "Mock Mobility Provider",
+    "enabled": true,
+    "capabilities": ["mobility"],
+    "cache_ttl_seconds": 604800,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_environment",
+    "display_name": "Mock Environment Provider",
+    "enabled": true,
+    "capabilities": ["environment"],
+    "cache_ttl_seconds": 2592000,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_security",
+    "display_name": "Mock Security Provider",
+    "enabled": false,
+    "capabilities": ["security"],
+    "cache_ttl_seconds": 86400,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_infrastructure",
+    "display_name": "Mock Infrastructure Provider",
+    "enabled": true,
+    "capabilities": ["infrastructure"],
+    "cache_ttl_seconds": 604800,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_appreciation",
+    "display_name": "Mock Appreciation Provider",
+    "enabled": true,
+    "capabilities": ["appreciation"],
+    "cache_ttl_seconds": 2592000,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_urban_context",
+    "display_name": "Mock Urban Context Provider",
+    "enabled": true,
+    "capabilities": ["urban_context"],
+    "cache_ttl_seconds": 2592000,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  }
+]

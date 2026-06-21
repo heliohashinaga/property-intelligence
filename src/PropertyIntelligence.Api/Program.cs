@@ -3,10 +3,14 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Microsoft.Extensions.Options;
 using PropertyIntelligence.Api.Endpoints;
 using PropertyIntelligence.Api.Middleware;
 using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
+using PropertyIntelligence.Core.Interfaces;
+using PropertyIntelligence.Core.Services;
+using PropertyIntelligence.Providers.Registry;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,6 +44,21 @@ var redisUrl = (builder.Configuration["REDIS_URL"]
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(redisUrl));
+
+// ── Provider registry (T086) ───────────────────────────────────────────────
+// The catalog is configuration-driven (appsettings `Providers:Catalog` array),
+// so enabling/disabling a data source requires no endpoint or engine rewrite.
+// T038 provides the `appsettings.Mock.json` profile with the 7 mock providers.
+builder.Services.Configure<ProviderCatalogOptions>(builder.Configuration.GetSection("Providers"));
+
+builder.Services.AddSingleton<IProviderRegistry>(sp =>
+{
+    var catalog = sp.GetRequiredService<IOptions<ProviderCatalogOptions>>().Value;
+    var descriptors = catalog.Catalog.ToDescriptors();
+    return new ProviderRegistry(descriptors);
+});
+
+builder.Services.AddScoped<PropertyEnrichmentModule>();
 
 // ── OpenTelemetry — OTLP exporter (T039 will wire remaining instrumentations) ─
 var otlpEndpoint = builder.Configuration["GRAFANA_OTLP_ENDPOINT"]
