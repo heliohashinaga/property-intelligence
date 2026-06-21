@@ -79,6 +79,40 @@ git worktree remove ../property-intelligence-<slice-name>
 3. PR created via `gh pr create --fill --base main` from within the worktree.
 4. PR approved → merge → worktree removed.
 
+### Multi-Agent Operational Rules (this repo)
+
+These rules are mandatory for any orchestration in this repository. The full
+playbook lives in the **`multi-agent-orchestration` skill** (global) — load
+it via `/skill:multi-agent-orchestration` when planning or delegating.
+
+- **Async by default.** Pass `async: true` to every `subagent`/`pi_messenger`
+  delegation unless there is a stated reason to block. Foreground runs discard
+  worktrees before merge on this machine.
+- **One writer per worktree.** Fan out read-only roles (scout, reviewer,
+  context-builder, researcher, planner, validator) in parallel; keep writers
+  isolated in `worktree: true` slices and merge deliberately. Never share a
+  dirty worktree between writers.
+- **Explicit `acceptance` only.** Never rely on inferred policy — it rejects
+  green builds with spurious `tests-added` gates. Enumerate only the evidence
+  that matters for the task; for hand-validated tasks use `level: "attested"`.
+- **Decision rules in the prompt, not escalations.** Foreseeable calls
+  (DTO layer placement when Core↔Providers would cycle, cache-key format,
+  mock provider shape, naming) are stated as rules in the task prompt.
+  Reserve `contact_supervisor` for genuinely unapproved scope.
+- **Commit-in-worktree before finishing.** Every worker MUST `git add -A &&
+  git commit` on its slice branch before reporting done, so work survives
+  worktree cleanup and is recoverable via cherry-pick/merge.
+- **Validation commands for this repo:** `dotnet build` (zero errors required),
+  `dotnet test tests/PropertyIntelligence.Tests.Unit` and
+  `...Tests.Contract` (fast, no I/O); `...Tests.Integration` needs Docker.
+  These are the `verify` commands for any `acceptance` contract here.
+- **Source of truth for progress:** `specs/001-property-intelligence-api/tasks.md`
+  — mark tasks `[x]` only after build + relevant tests pass AND the work is
+  committed (in a worktree branch or main).
+- **Don't orchestrate when it doesn't pay.** For ≤4 tight-coupled tasks in one
+  commit, implement directly; use read-only subagents for context/review only.
+  See the skill's "When subagent orchestration does NOT pay" section.
+
 ---
 
 This file is the runtime reference for AI agents working on this codebase.
