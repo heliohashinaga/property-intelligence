@@ -1,0 +1,32 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "normalizedAddress": "Rua Augusta, 1500 - Consolação, São Paulo - SP",
+        "streetName": "Rua Augusta",
+        "streetNumber": "1500",
+        "neighborhood": "Consolação",
+        "city": "São Paulo",
+        "state": "SP",
+        "postalCode": "01310100",
+        "lat": -23.5563,
+        "lng": -46.6543
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "normalizedAddress": "Av. Paulista, 1000 - Bela Vista, São Paulo - SP",
+        "streetName": "Av. Paulista",
+        "streetNumber": "1000",
+        "neighborhood": "Bela Vista",
+        "city": "São Paulo",
+        "state": "SP",
+        "postalCode": "01310100",
+        "lat": -23.5614,
+        "lng": -46.6563
+      }
+    }
+  ]
+}

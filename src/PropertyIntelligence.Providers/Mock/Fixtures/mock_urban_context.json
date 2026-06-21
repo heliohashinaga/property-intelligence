@@ -1,0 +1,22 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "medianIncomeGroup": 4,
+        "populationDensity": 9500.0,
+        "workingAgePct": 72.5,
+        "urbanContextTrend": "Stable"
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "medianIncomeGroup": 5,
+        "populationDensity": 7200.0,
+        "workingAgePct": 68.0,
+        "urbanContextTrend": "Improving"
+      }
+    }
+  ]
+}

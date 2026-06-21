@@ -1,0 +1,22 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "hospitalsWithin2km": 3,
+        "clinicsWith2km": 7,
+        "emergencyUnits2km": 2,
+        "infrastructureTrend": "Stable"
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "hospitalsWithin2km": 4,
+        "clinicsWith2km": 5,
+        "emergencyUnits2km": 1,
+        "infrastructureTrend": "Improving"
+      }
+    }
+  ]
+}

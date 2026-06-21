@@ -1,0 +1,28 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "transitStops500m": 18,
+        "transitStops1km": 32,
+        "pois2km": 450,
+        "supermarkets1km": 5,
+        "pharmacies1km": 8,
+        "parks1km": 2,
+        "mobilityTrend": "Improving"
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "transitStops500m": 22,
+        "transitStops1km": 40,
+        "pois2km": 380,
+        "supermarkets1km": 3,
+        "pharmacies1km": 6,
+        "parks1km": 3,
+        "mobilityTrend": "Stable"
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "address": {
+    "normalized": "Rua Augusta, 1500 - Consolação, São Paulo - SP",
+    "street": "Rua Augusta",
+    "number": "1500",
+    "neighborhood": "Consolação",
+    "city": "São Paulo",
+    "state": "SP",
+    "postal_code": "01310100",
+    "coordinates": {
+      "latitude": -23.5563,
+      "longitude": -46.6543
+    }
+  },
+  "score": {
+    "composite": 724,
+    "max": 1000,
+    "grade": "B+",
+    "dimensions": {
+      "security": { "score": 118, "max": 200, "trend": "worsening", "status": "available" },
+      "mobility": { "score": 185, "max": 200, "trend": "improving", "status": "available" },
+      "infrastructure": { "score": 162, "max": 200, "trend": "stable", "status": "available" },
+      "environment": { "score": 95, "max": 200, "trend": "stable", "status": "available" },
+      "appreciation": { "score": 104, "max": 200, "trend": "improving", "status": "available" },
+      "urban_context": { "score": 60, "max": 200, "trend": "stable", "status": "available" }
+    }
+  },
+  "risk_flags": ["moderate_flood_risk", "crime_trend_12m"],
+  "opportunity_flags": ["zoning_upscale", "appreciation_trend_up"],
+  "insight": "A Rua Augusta tem mobilidade excepcional — metrô Consolação a 400m e 18 linhas de ônibus no raio de 500m. O score de segurança é médio: crimes patrimoniais cresceram 8% nos últimos 12 meses na região. O ponto de atenção é ambiental: o endereço está a 200m de uma área mapeada pela ANA como risco moderado de alagamento. A tendência de valorização é positiva — zoneamento permite até 24 andares.",
+  "insight_unavailable": false,
+  "warnings": [],
+  "providers_used": ["mock_address", "mock_mobility", "mock_environment", "mock_security", "mock_health", "mock_school", "mock_appreciation", "mock_urban_context"],
+  "providers_unavailable": [],
+  "cached": false,
+  "analysis_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "analyzed_at": "2026-05-28T10:23:00Z"
+}

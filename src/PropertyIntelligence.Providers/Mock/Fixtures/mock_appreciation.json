@@ -1,0 +1,20 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "valorVenal": 850000.00,
+        "zoningClass": "ZM-1",
+        "appreciationTrend": "Improving"
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "valorVenal": 1200000.00,
+        "zoningClass": "ZEU",
+        "appreciationTrend": "Stable"
+      }
+    }
+  ]
+}

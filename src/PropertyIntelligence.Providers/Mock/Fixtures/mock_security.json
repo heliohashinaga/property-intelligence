@@ -1,0 +1,20 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "crimeRatePer100k": 2850.5,
+        "yoyChangePct": 8.0,
+        "securityTrend": "Worsening"
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "crimeRatePer100k": 2100.0,
+        "yoyChangePct": -3.0,
+        "securityTrend": "Improving"
+      }
+    }
+  ]
+}

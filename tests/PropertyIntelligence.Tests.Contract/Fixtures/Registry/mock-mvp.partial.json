@@ -40,11 +40,21 @@
     "version": "1.0.0"
   },
   {
-    "provider_id": "mock_infrastructure",
-    "display_name": "Mock Infrastructure Provider",
+    "provider_id": "mock_health",
+    "display_name": "Mock Health Provider",
     "enabled": true,
     "capabilities": ["infrastructure"],
     "cache_ttl_seconds": 604800,
+    "timeout_seconds": 5,
+    "source_type": "imported",
+    "version": "1.0.0"
+  },
+  {
+    "provider_id": "mock_school",
+    "display_name": "Mock School Provider",
+    "enabled": true,
+    "capabilities": ["infrastructure"],
+    "cache_ttl_seconds": 2592000,
     "timeout_seconds": 5,
     "source_type": "imported",
     "version": "1.0.0"

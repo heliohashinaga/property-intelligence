@@ -10,6 +10,7 @@ using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 using PropertyIntelligence.Core.Services;
+using PropertyIntelligence.Providers.Mock;
 using PropertyIntelligence.Providers.Registry;
 using StackExchange.Redis;
 
@@ -59,6 +60,17 @@ builder.Services.AddSingleton<IProviderRegistry>(sp =>
 });
 
 builder.Services.AddScoped<PropertyEnrichmentModule>();
+
+// ── Mock providers (T018–T025) ─────────────────────────────────────────────
+// Conditionally register mock providers when Providers:Profile == "mock".
+// Marco 2 (T026) will wire the enrichment module to call these adapters.
+var providerProfile = builder.Configuration["Providers:Profile"]
+    ?? Environment.GetEnvironmentVariable("PROVIDERS_PROFILE");
+
+if (providerProfile == "mock")
+{
+    builder.Services.AddMockProviders();
+}
 
 // ── OpenTelemetry — OTLP exporter (T039 will wire remaining instrumentations) ─
 var otlpEndpoint = builder.Configuration["GRAFANA_OTLP_ENDPOINT"]

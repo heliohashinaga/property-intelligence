@@ -1,0 +1,44 @@
+{
+  "address": {
+    "normalized": "Rua Augusta, 1500 - Consolação, São Paulo - SP",
+    "street": "Rua Augusta",
+    "number": "1500",
+    "neighborhood": "Consolação",
+    "city": "São Paulo",
+    "state": "SP",
+    "postal_code": "01310100",
+    "coordinates": {
+      "latitude": -23.5563,
+      "longitude": -46.6543
+    }
+  },
+  "score": {
+    "composite": 606,
+    "max": 800,
+    "grade": "B+",
+    "dimensions": {
+      "security": { "score": null, "max": 200, "trend": null, "status": "unavailable" },
+      "mobility": { "score": 185, "max": 200, "trend": "improving", "status": "available" },
+      "infrastructure": { "score": 162, "max": 200, "trend": "stable", "status": "available" },
+      "environment": { "score": 95, "max": 200, "trend": "stable", "status": "available" },
+      "appreciation": { "score": 104, "max": 200, "trend": "improving", "status": "available" },
+      "urban_context": { "score": 60, "max": 200, "trend": "stable", "status": "available" }
+    }
+  },
+  "risk_flags": ["moderate_flood_risk"],
+  "opportunity_flags": ["zoning_upscale", "appreciation_trend_up"],
+  "insight": "A análise de segurança não pôde ser realizada por indisponibilidade temporária dos dados. Nos demais aspectos avaliados, a Rua Augusta apresenta mobilidade excepcional e risco ambiental moderado.",
+  "insight_unavailable": false,
+  "warnings": [
+    {
+      "dimension": "security",
+      "provider": "mock_security",
+      "message": "Dados de mock_security indisponíveis no momento. A dimensão 'security' foi excluída do cálculo."
+    }
+  ],
+  "providers_used": ["mock_address", "mock_mobility", "mock_environment", "mock_health", "mock_school", "mock_appreciation", "mock_urban_context"],
+  "providers_unavailable": ["mock_security"],
+  "cached": false,
+  "analysis_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "analyzed_at": "2026-05-28T10:23:05Z"
+}

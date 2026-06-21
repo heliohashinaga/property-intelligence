@@ -1,0 +1,20 @@
+{
+  "scenarios": [
+    {
+      "address": "Rua Augusta, 1500, São Paulo",
+      "data": {
+        "schoolsWithin2km": 6,
+        "nearestSchoolIdeb": 6.8,
+        "infrastructureTrend": "Stable"
+      }
+    },
+    {
+      "address": "Av. Paulista, 1000, São Paulo",
+      "data": {
+        "schoolsWithin2km": 8,
+        "nearestSchoolIdeb": 7.2,
+        "infrastructureTrend": "Improving"
+      }
+    }
+  ]
+}
