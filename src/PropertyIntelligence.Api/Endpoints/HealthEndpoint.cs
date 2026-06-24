@@ -16,20 +16,20 @@ public static class HealthEndpoint
     {
         app.MapGet("/health", async (HttpContext ctx) =>
         {
-            var db    = ctx.RequestServices.GetRequiredService<PropertyIntelligenceDbContext>();
+            var db = ctx.RequestServices.GetRequiredService<PropertyIntelligenceDbContext>();
             var redis = ctx.RequestServices.GetService<IConnectionMultiplexer>();
 
-            var (dbStatus, dbHealthy)       = await CheckDatabaseAsync(db, ctx.RequestAborted);
+            var (dbStatus, dbHealthy) = await CheckDatabaseAsync(db, ctx.RequestAborted);
             var (redisStatus, redisHealthy) = await CheckRedisAsync(redis, ctx.RequestAborted);
 
             var overallStatus = (dbHealthy && redisHealthy) ? "healthy" : "degraded";
-            var httpStatus    = dbHealthy ? 200 : 503;
+            var httpStatus = dbHealthy ? 200 : 503;
 
             var response = new
             {
-                status    = overallStatus,
-                version   = "1.0.0",
-                checks    = new { database = dbStatus, redis = redisStatus },
+                status = overallStatus,
+                version = "1.0.0",
+                checks = new { database = dbStatus, redis = redisStatus },
                 timestamp = DateTimeOffset.UtcNow,
             };
 

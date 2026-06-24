@@ -19,18 +19,15 @@ public sealed class MockSchoolProvider : IDataProvider<SchoolData>
 
     public MockSchoolProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<SchoolData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<SchoolData>("mock_school", address.NormalizedAddress);
-        return Task.FromResult(data ?? new SchoolData
+    public Task<ProviderFetchResult<SchoolData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_school", address.NormalizedAddress, () => new SchoolData
         {
-            SchoolsWithin2km      = 4,
-            NearestSchoolIdeb     = 6.0,
-            InfrastructureTrend   = TrendDirection.Stable,
-        });
-    }
+            SchoolsWithin2km = 4,
+            NearestSchoolIdeb = 6.0,
+            InfrastructureTrend = TrendDirection.Stable,
+        }));
 }

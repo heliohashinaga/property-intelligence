@@ -1,4 +1,4 @@
-﻿namespace PropertyIntelligence.Tests.Integration;
+namespace PropertyIntelligence.Tests.Integration;
 
 public class UnitTest1
 {

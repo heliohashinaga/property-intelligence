@@ -27,15 +27,15 @@ public sealed record AnalysisWarning
     public static AnalysisWarning ProviderUnavailable(string providerName, string dimension) =>
         new()
         {
-            Code      = "provider_unavailable",
-            Message   = $"Dados de {providerName} indisponíveis no momento. A dimensão '{dimension}' foi excluída do cálculo.",
+            Code = "provider_unavailable",
+            Message = $"Dados de {providerName} indisponíveis no momento. A dimensão '{dimension}' foi excluída do cálculo.",
             Dimension = dimension
         };
 
     public static AnalysisWarning InsightUnavailable() =>
         new()
         {
-            Code    = "insight_unavailable",
+            Code = "insight_unavailable",
             Message = "Explicação indisponível no momento. O score e as dimensões estão completos.",
         };
 }

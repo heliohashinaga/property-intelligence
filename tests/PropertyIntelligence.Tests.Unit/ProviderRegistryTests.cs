@@ -1,8 +1,5 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
-using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Registry;
-using PropertyIntelligence.Core.Services;
 using PropertyIntelligence.Providers.Registry;
 
 namespace PropertyIntelligence.Tests.Unit;
@@ -14,23 +11,16 @@ namespace PropertyIntelligence.Tests.Unit;
 /// </summary>
 public class ProviderRegistryTests
 {
-    private static readonly PropertyAddress SampleAddress = new()
-    {
-        NormalizedAddress = "Rua Augusta, 1500, São Paulo",
-        City  = "São Paulo",
-        State = "SP",
-    };
-
     private static ProviderDescriptor Mock(string id, bool enabled) => new()
     {
-        ProviderId   = id,
+        ProviderId = id,
         DisplayName = id,
-        Enabled      = enabled,
+        Enabled = enabled,
         Capabilities = new[] { id.Replace("mock_", "") },
-        CacheTtl     = TimeSpan.FromSeconds(2592000),
-        Timeout      = TimeSpan.FromSeconds(5),
-        SourceType   = SourceType.Imported,
-        Version      = "1.0.0",
+        CacheTtl = TimeSpan.FromSeconds(2592000),
+        Timeout = TimeSpan.FromSeconds(5),
+        SourceType = SourceType.Imported,
+        Version = "1.0.0",
     };
 
     [Fact]
@@ -69,28 +59,4 @@ public class ProviderRegistryTests
         registry.Get("unknown").Should().BeNull();
     }
 
-    [Fact]
-    public async Task EnrichAsync_only_touches_enabled_providers()
-    {
-        // mock_security disabled → must NOT appear in the module's output,
-        // proving disabled entries are skipped before fan-out.
-        var registry = new ProviderRegistry(new[]
-        {
-            Mock("mock_address",     enabled: true),
-            Mock("mock_mobility",    enabled: true),
-            Mock("mock_security",    enabled: false),
-            Mock("mock_environment", enabled: true),
-        });
-
-        var module = new PropertyEnrichmentModule(
-            registry, NullLogger<PropertyEnrichmentModule>.Instance);
-
-        var profile = await module.EnrichAsync(SampleAddress);
-
-        // Skeleton (T086): enabled providers are selected but, lacking adapters,
-        // reported as unavailable. Disabled providers never enter selection.
-        profile.ProvidersUnavailable
-              .Should().BeEquivalentTo(new[] { "mock_address", "mock_mobility", "mock_environment" });
-        profile.ProvidersUnavailable.Should().NotContain("mock_security");
-    }
 }

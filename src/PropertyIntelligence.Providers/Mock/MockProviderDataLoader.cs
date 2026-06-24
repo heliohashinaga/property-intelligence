@@ -20,8 +20,8 @@ public sealed class MockProviderDataLoader
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy        = JsonNamingPolicy.CamelCase,
-        Converters                  = { new JsonStringEnumConverter() },
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
     };
 
     /// <summary>Per-provider fixture cache (parse once on first access).</summary>
@@ -41,7 +41,7 @@ public sealed class MockProviderDataLoader
 
     public MockProviderDataLoader(ILogger<MockProviderDataLoader> logger)
     {
-        _logger   = logger;
+        _logger = logger;
         _assembly = typeof(MockProviderDataLoader).Assembly;
     }
 
@@ -58,6 +58,41 @@ public sealed class MockProviderDataLoader
             return null;
 
         return raw.Value.Deserialize<T>(JsonOptions);
+    }
+
+    /// <summary>
+    /// Loads the typed fixture payload together with the exact raw JSON used to
+    /// build it. If no fixture is available, returns a synthetic audit envelope
+    /// that explicitly marks the payload as fallback-generated.
+    /// </summary>
+    public ProviderFetchResult<T> LoadResult<T>(string providerId, string address, Func<T> fallbackFactory) where T : class
+    {
+        var raw = LoadRaw(providerId, address);
+        if (raw is not null)
+        {
+            var data = raw.Value.Deserialize<T>(JsonOptions)
+                ?? throw new InvalidOperationException($"Fixture data for provider '{providerId}' could not be deserialized to {typeof(T).Name}.");
+
+            return new ProviderFetchResult<T>
+            {
+                Data = data,
+                RawPayload = raw.Value.GetRawText(),
+            };
+        }
+
+        var fallback = fallbackFactory();
+        return new ProviderFetchResult<T>
+        {
+            Data = fallback,
+            RawPayload = JsonSerializer.Serialize(new
+            {
+                synthetic = true,
+                provider = providerId,
+                requestedAddress = address,
+                reason = "fixture_unavailable",
+                data = fallback,
+            }, JsonOptions),
+        };
     }
 
     /// <summary>

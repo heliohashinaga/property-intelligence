@@ -19,22 +19,19 @@ public sealed class MockMobilityProvider : IDataProvider<PoiData>
 
     public MockMobilityProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<PoiData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<PoiData>("mock_mobility", address.NormalizedAddress);
-        return Task.FromResult(data ?? new PoiData
+    public Task<ProviderFetchResult<PoiData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_mobility", address.NormalizedAddress, () => new PoiData
         {
             TransitStops500m = 10,
-            TransitStops1km  = 20,
-            Pois2km          = 200,
-            Supermarkets1km  = 3,
-            Pharmacies1km    = 4,
-            Parks1km         = 1,
-            MobilityTrend    = TrendDirection.Stable,
-        });
-    }
+            TransitStops1km = 20,
+            Pois2km = 200,
+            Supermarkets1km = 3,
+            Pharmacies1km = 4,
+            Parks1km = 1,
+            MobilityTrend = TrendDirection.Stable,
+        }));
 }

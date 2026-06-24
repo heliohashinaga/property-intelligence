@@ -17,9 +17,9 @@ public interface IDataProvider<TResult>
     TimeSpan CacheTtl { get; }
 
     /// <summary>
-    /// Fetches data for <paramref name="address"/>.
-    /// MUST store the raw HTTP/file payload via <see cref="ICacheService"/>
-    /// BEFORE returning a transformed result, so the original is recoverable.
+    /// Fetches data for <paramref name="address"/> and returns both the typed
+    /// domain payload and the original raw source payload captured before
+    /// transformation, so the original is recoverable for audit.
     /// </summary>
-    Task<TResult> FetchAsync(PropertyAddress address, CancellationToken ct = default);
+    Task<ProviderFetchResult<TResult>> FetchAsync(PropertyAddress address, CancellationToken ct = default);
 }

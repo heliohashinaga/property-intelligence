@@ -19,19 +19,16 @@ public sealed class MockHealthProvider : IDataProvider<HealthData>
 
     public MockHealthProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<HealthData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<HealthData>("mock_health", address.NormalizedAddress);
-        return Task.FromResult(data ?? new HealthData
+    public Task<ProviderFetchResult<HealthData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_health", address.NormalizedAddress, () => new HealthData
         {
-            HospitalsWithin2km     = 2,
-            ClinicsWith2km         = 4,
-            EmergencyUnits2km      = 1,
-            InfrastructureTrend    = TrendDirection.Stable,
-        });
-    }
+            HospitalsWithin2km = 2,
+            ClinicsWith2km = 4,
+            EmergencyUnits2km = 1,
+            InfrastructureTrend = TrendDirection.Stable,
+        }));
 }

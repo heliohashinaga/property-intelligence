@@ -21,19 +21,16 @@ public sealed class MockAddressProvider : IDataProvider<AddressInfo>
 
     public MockAddressProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
     /// <inheritdoc />
-    public Task<AddressInfo> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<AddressInfo>("mock_address", address.NormalizedAddress);
-        return Task.FromResult(data ?? new AddressInfo
+    public Task<ProviderFetchResult<AddressInfo>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_address", address.NormalizedAddress, () => new AddressInfo
         {
             NormalizedAddress = address.NormalizedAddress,
-            City              = address.City,
-            State             = address.State,
-        });
-    }
+            City = address.City,
+            State = address.State,
+        }));
 }

@@ -17,7 +17,7 @@ public static class CacheKeyHelper
     {
         var input = normalizedAddress.ToLowerInvariant();
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        var hex   = Convert.ToHexString(bytes).ToLowerInvariant();
+        var hex = Convert.ToHexString(bytes).ToLowerInvariant();
         return $"{providerName}:{hex[..16]}";
     }
 }

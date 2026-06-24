@@ -1,4 +1,4 @@
-﻿namespace PropertyIntelligence.Tests.Contract;
+namespace PropertyIntelligence.Tests.Contract;
 
 public class UnitTest1
 {

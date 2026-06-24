@@ -19,18 +19,15 @@ public sealed class MockSecurityProvider : IDataProvider<CrimeData>
 
     public MockSecurityProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<CrimeData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<CrimeData>("mock_security", address.NormalizedAddress);
-        return Task.FromResult(data ?? new CrimeData
+    public Task<ProviderFetchResult<CrimeData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_security", address.NormalizedAddress, () => new CrimeData
         {
             CrimeRatePer100k = 2500,
-            YoyChangePct     = 0,
-            SecurityTrend    = TrendDirection.Stable,
-        });
-    }
+            YoyChangePct = 0,
+            SecurityTrend = TrendDirection.Stable,
+        }));
 }

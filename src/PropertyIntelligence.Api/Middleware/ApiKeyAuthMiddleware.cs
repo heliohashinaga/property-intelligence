@@ -19,7 +19,7 @@ public sealed class ApiKeyAuthMiddleware
 
     public ApiKeyAuthMiddleware(RequestDelegate next, ILogger<ApiKeyAuthMiddleware> logger)
     {
-        _next   = next;
+        _next = next;
         _logger = logger;
     }
 
@@ -27,6 +27,14 @@ public sealed class ApiKeyAuthMiddleware
     {
         // /health is public — no auth required
         if (context.Request.Path.StartsWithSegments("/health"))
+        {
+            await _next(context);
+            return;
+        }
+
+        // Upstream middleware may pre-resolve the consumer (e.g. tests or a
+        // trusted gateway). When present, skip the DB lookup and continue.
+        if (context.Items.ContainsKey("ApiConsumer"))
         {
             await _next(context);
             return;
@@ -41,7 +49,7 @@ public sealed class ApiKeyAuthMiddleware
 
         var keyHash = ComputeSha256Hex(rawKey!);
 
-        var db       = context.RequestServices.GetRequiredService<PropertyIntelligenceDbContext>();
+        var db = context.RequestServices.GetRequiredService<PropertyIntelligenceDbContext>();
         var consumer = await db.ApiConsumers
             .FirstOrDefaultAsync(c => c.ApiKeyHash == keyHash && c.IsActive,
                                  context.RequestAborted);
@@ -72,7 +80,7 @@ public sealed class ApiKeyAuthMiddleware
 
     private static async Task WriteUnauthorizedAsync(HttpContext context, string message)
     {
-        context.Response.StatusCode  = 401;
+        context.Response.StatusCode = 401;
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsync(
             $"{{\"error\":\"{message}\",\"status\":401}}",

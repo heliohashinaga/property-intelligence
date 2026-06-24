@@ -17,13 +17,13 @@ public sealed class CacheService : ICacheService
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        PropertyNamingPolicy        = JsonNamingPolicy.CamelCase,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
     };
 
     public CacheService(IConnectionMultiplexer redis, ILogger<CacheService> logger)
     {
-        _db     = redis.GetDatabase();
+        _db = redis.GetDatabase();
         _logger = logger;
     }
 

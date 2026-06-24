@@ -19,18 +19,15 @@ public sealed class MockEnvironmentProvider : IDataProvider<FloodRiskData>
 
     public MockEnvironmentProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<FloodRiskData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<FloodRiskData>("mock_environment", address.NormalizedAddress);
-        return Task.FromResult(data ?? new FloodRiskData
+    public Task<ProviderFetchResult<FloodRiskData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_environment", address.NormalizedAddress, () => new FloodRiskData
         {
-            RiskLevel       = null,
-            DistanceMetres  = null,
-            Trend           = TrendDirection.Stable,
-        });
-    }
+            RiskLevel = null,
+            DistanceMetres = null,
+            Trend = TrendDirection.Stable,
+        }));
 }

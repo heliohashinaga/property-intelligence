@@ -71,9 +71,9 @@ and confirmed failing before each implementation task.
 
 ### Contract Tests for US1 Mock Slice (write first, confirm failing)
 
-- [ ] T015 [P] [US1] Write contract test for `POST /v1/property/analyze` mock happy path in `tests/PropertyIntelligence.Tests.Contract/AnalyzeEndpointTests.cs`; verify response schema matches `contracts/analyze-endpoint.md`; load enabled providers from `Fixtures/Registry/mock-mvp.providers.json`; confirm test FAILS before implementation
-- [ ] T016 [P] [US1] Write contract test for graceful degradation using mock providers in `tests/PropertyIntelligence.Tests.Contract/AnalyzeEndpointTests.cs`; disable or fail one mock dimension provider via registry fixture; verify `score.max == 800`, `warnings` populated, and `providers_unavailable` contains only the failed enabled provider; confirm FAILS
-- [ ] T017 [P] [US1] Write unit test for `PropertyEnrichmentModule` registry selection and unavailable-provider handling in `tests/PropertyIntelligence.Tests.Unit/PropertyEnrichmentModuleTests.cs`; assert disabled providers are skipped before fan-out and failed enabled providers are recorded; confirm FAILS
+- [x] T015 [P] [US1] Write contract test for `POST /v1/property/analyze` mock happy path in `tests/PropertyIntelligence.Tests.Contract/AnalyzeEndpointTests.cs`; verify response schema matches `contracts/analyze-endpoint.md`; load enabled providers from `Fixtures/Registry/mock-mvp.providers.json`; confirm test FAILS before implementation
+- [x] T016 [P] [US1] Write contract test for graceful degradation using mock providers in `tests/PropertyIntelligence.Tests.Contract/AnalyzeEndpointTests.cs`; disable or fail one mock dimension provider via registry fixture; verify `score.max == 800`, `warnings` populated, and `providers_unavailable` contains only the failed enabled provider; confirm FAILS
+- [x] T017 [P] [US1] Write unit test for `PropertyEnrichmentModule` registry selection and unavailable-provider handling in `tests/PropertyIntelligence.Tests.Unit/PropertyEnrichmentModuleTests.cs`; assert disabled providers are skipped before fan-out and failed enabled providers are recorded; confirm FAILS
 
 ### Implementation for US1 Mock Slice
 

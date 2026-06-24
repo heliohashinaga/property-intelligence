@@ -19,19 +19,16 @@ public sealed class MockUrbanContextProvider : IDataProvider<CensusData>
 
     public MockUrbanContextProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<CensusData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<CensusData>("mock_urban_context", address.NormalizedAddress);
-        return Task.FromResult(data ?? new CensusData
+    public Task<ProviderFetchResult<CensusData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_urban_context", address.NormalizedAddress, () => new CensusData
         {
-            MedianIncomeGroup  = 3,
-            PopulationDensity  = 8000,
-            WorkingAgePct      = 70,
-            UrbanContextTrend  = TrendDirection.Stable,
-        });
-    }
+            MedianIncomeGroup = 3,
+            PopulationDensity = 8000,
+            WorkingAgePct = 70,
+            UrbanContextTrend = TrendDirection.Stable,
+        }));
 }

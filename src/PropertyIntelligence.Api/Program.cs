@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Microsoft.Extensions.Options;
 using PropertyIntelligence.Api.Endpoints;
 using PropertyIntelligence.Api.Middleware;
 using PropertyIntelligence.Core.Data;
@@ -22,8 +22,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(opts =>
 {
-    opts.IncludeScopes     = true;
-    opts.TimestampFormat   = "O";            // ISO 8601 with offset
+    opts.IncludeScopes = true;
+    opts.TimestampFormat = "O";            // ISO 8601 with offset
     opts.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
 });
 
@@ -59,6 +59,7 @@ builder.Services.AddSingleton<IProviderRegistry>(sp =>
     return new ProviderRegistry(descriptors);
 });
 
+builder.Services.AddScoped<IDataProviderRawLogStore, EfCoreDataProviderRawLogStore>();
 builder.Services.AddScoped<PropertyEnrichmentModule>();
 
 // ── Mock providers (T018–T025) ─────────────────────────────────────────────
@@ -112,7 +113,7 @@ if (!string.IsNullOrEmpty(otlpEndpoint))
 {
     builder.Logging.AddOpenTelemetry(otlpLogs =>
     {
-        otlpLogs.IncludeScopes          = true;
+        otlpLogs.IncludeScopes = true;
         otlpLogs.IncludeFormattedMessage = true;
     });
 }
@@ -133,7 +134,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Correlation-Id"] = correlationId;
 
     var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-    var sw     = System.Diagnostics.Stopwatch.StartNew();
+    var sw = System.Diagnostics.Stopwatch.StartNew();
 
     await next(context);
 
@@ -169,3 +170,5 @@ app.MapHealthEndpoint();
 // TODO T039: register all providers, engine, enrichment module, explainability service
 
 app.Run();
+
+public partial class Program { }

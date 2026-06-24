@@ -19,18 +19,15 @@ public sealed class MockAppreciationProvider : IDataProvider<IptuData>
 
     public MockAppreciationProvider(MockProviderDataLoader loader, TimeSpan cacheTtl)
     {
-        _loader   = loader;
+        _loader = loader;
         _cacheTtl = cacheTtl;
     }
 
-    public Task<IptuData> FetchAsync(PropertyAddress address, CancellationToken ct = default)
-    {
-        var data = _loader.Load<IptuData>("mock_appreciation", address.NormalizedAddress);
-        return Task.FromResult(data ?? new IptuData
+    public Task<ProviderFetchResult<IptuData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        => Task.FromResult(_loader.LoadResult("mock_appreciation", address.NormalizedAddress, () => new IptuData
         {
-            ValorVenal          = 750000,
-            ZoningClass         = "ZM-1",
-            AppreciationTrend   = TrendDirection.Stable,
-        });
-    }
+            ValorVenal = 750000,
+            ZoningClass = "ZM-1",
+            AppreciationTrend = TrendDirection.Stable,
+        }));
 }

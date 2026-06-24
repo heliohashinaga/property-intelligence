@@ -28,6 +28,11 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Verify whitespace formatting
+        # Full analyzer/style enforcement still has backlog warnings; the CI gate
+        # is intentionally whitespace-only until those warnings are addressed.
+        run: dotnet format whitespace --verify-no-changes --no-restore
+
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
@@ -78,6 +83,11 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore
+
+      - name: Verify whitespace formatting
+        # Full analyzer/style enforcement still has backlog warnings; the CI gate
+        # is intentionally whitespace-only until those warnings are addressed.
+        run: dotnet format whitespace --verify-no-changes --no-restore
 
       - name: Build
         run: dotnet build --no-restore --configuration Release

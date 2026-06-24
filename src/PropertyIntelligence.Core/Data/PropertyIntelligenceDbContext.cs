@@ -15,10 +15,10 @@ public sealed class PropertyIntelligenceDbContext : DbContext
         DbContextOptions<PropertyIntelligenceDbContext> options)
         : base(options) { }
 
-    public DbSet<PropertyAddress>     PropertyAddresses     => Set<PropertyAddress>();
-    public DbSet<PropertyAnalysis>    PropertyAnalyses      => Set<PropertyAnalysis>();
-    public DbSet<ApiConsumer>         ApiConsumers          => Set<ApiConsumer>();
-    public DbSet<DataProviderRawLog>  DataProviderRawLogs   => Set<DataProviderRawLog>();
+    public DbSet<PropertyAddress> PropertyAddresses => Set<PropertyAddress>();
+    public DbSet<PropertyAnalysis> PropertyAnalyses => Set<PropertyAnalysis>();
+    public DbSet<ApiConsumer> ApiConsumers => Set<ApiConsumer>();
+    public DbSet<DataProviderRawLog> DataProviderRawLogs => Set<DataProviderRawLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

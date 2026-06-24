@@ -1,4 +1,4 @@
-﻿namespace PropertyIntelligence.Rules;
+namespace PropertyIntelligence.Rules;
 
 public class Class1
 {

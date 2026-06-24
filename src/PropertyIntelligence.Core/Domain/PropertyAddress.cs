@@ -12,7 +12,7 @@ public sealed record PropertyAddress
     /// <summary>Full normalized address string, e.g. "Rua Augusta, 1500 - Consolação, São Paulo - SP, 01304-001".</summary>
     public required string NormalizedAddress { get; init; }
 
-    public string? StreetName   { get; init; }
+    public string? StreetName { get; init; }
     public string? StreetNumber { get; init; }
     public string? Neighborhood { get; init; }
 

@@ -41,21 +41,21 @@ public static class RegistryProviderRegistry
 
     private static ProviderDescriptor Map(FixtureEntry e) => new()
     {
-        ProviderId   = e.ProviderId,
-        DisplayName  = e.DisplayName,
-        Enabled      = e.Enabled,
+        ProviderId = e.ProviderId,
+        DisplayName = e.DisplayName,
+        Enabled = e.Enabled,
         Capabilities = (e.Capabilities ?? Array.Empty<string>()).ToList(),
-        CacheTtl     = TimeSpan.FromSeconds(e.CacheTtlSeconds),
-        Timeout      = TimeSpan.FromSeconds(e.TimeoutSeconds),
-        SourceType   = MapSourceType(e.SourceType),
-        Version      = e.Version,
+        CacheTtl = TimeSpan.FromSeconds(e.CacheTtlSeconds),
+        Timeout = TimeSpan.FromSeconds(e.TimeoutSeconds),
+        SourceType = MapSourceType(e.SourceType),
+        Version = e.Version,
     };
 
     private static SourceType MapSourceType(string? s) => s switch
     {
         "real_time" => SourceType.RealTime,
-        "local_db"  => SourceType.LocalDb,
-        _           => SourceType.Imported,
+        "local_db" => SourceType.LocalDb,
+        _ => SourceType.Imported,
     };
 
     private sealed class FixtureEntry
