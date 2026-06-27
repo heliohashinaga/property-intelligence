@@ -21,6 +21,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <ProjectReference Include="..\..\src\PropertyIntelligence.Core\PropertyIntelligence.Core.csproj" />
+    <ProjectReference Include="..\..\src\PropertyIntelligence.Explainability\PropertyIntelligence.Explainability.csproj" />
     <ProjectReference Include="..\..\src\PropertyIntelligence.Providers\PropertyIntelligence.Providers.csproj" />
     <ProjectReference Include="..\..\src\PropertyIntelligence.Rules\PropertyIntelligence.Rules.csproj" />
   </ItemGroup>
