@@ -94,6 +94,67 @@ public sealed class PropertyEnrichmentModuleTests
             && log.RawPayload.Contains("Simulated provider failure", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task EnrichAsync_records_timeout_as_unavailable_for_enabled_provider()
+    {
+        var addressProvider = new TrackingAddressProvider();
+        var timedOutSecurityProvider = new TimedOutCrimeProvider("mock_security");
+        var rawLogStore = new TrackingRawLogStore();
+
+        using var services = BuildServices(
+            descriptors:
+            [
+                Descriptor("mock_address", enabled: true, capability: "address"),
+                Descriptor("mock_security", enabled: true, capability: "security", timeoutSeconds: 0.01),
+            ],
+            configure: collection =>
+            {
+                collection.AddSingleton<IDataProviderRawLogStore>(rawLogStore);
+                collection.AddSingleton<IDataProvider<AddressInfo>>(addressProvider);
+                collection.AddSingleton<IDataProvider<CrimeData>>(timedOutSecurityProvider);
+            });
+
+        var module = services.GetRequiredService<PropertyEnrichmentModule>();
+        var profile = await module.EnrichAsync(SampleAddress);
+
+        addressProvider.CallCount.Should().Be(1);
+        timedOutSecurityProvider.CallCount.Should().Be(1);
+        profile.CrimeData.Should().BeNull();
+        profile.ProvidersUnavailable.Should().ContainSingle().Which.Should().Be("mock_security");
+        rawLogStore.Logs.Should().ContainSingle(static log =>
+            log.ProviderName == "mock_security"
+            && log.RawPayload.Contains("\"error\":\"timeout\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task EnrichAsync_marks_enabled_provider_as_unavailable_when_not_registered_in_di()
+    {
+        var addressProvider = new TrackingAddressProvider();
+        var rawLogStore = new TrackingRawLogStore();
+
+        using var services = BuildServices(
+            descriptors:
+            [
+                Descriptor("mock_address", enabled: true, capability: "address"),
+                Descriptor("mock_security", enabled: true, capability: "security"),
+            ],
+            configure: collection =>
+            {
+                collection.AddSingleton<IDataProviderRawLogStore>(rawLogStore);
+                collection.AddSingleton<IDataProvider<AddressInfo>>(addressProvider);
+            });
+
+        var module = services.GetRequiredService<PropertyEnrichmentModule>();
+        var profile = await module.EnrichAsync(SampleAddress);
+
+        addressProvider.CallCount.Should().Be(1);
+        profile.CrimeData.Should().BeNull();
+        profile.ProvidersUnavailable.Should().ContainSingle().Which.Should().Be("mock_security");
+        rawLogStore.Logs.Should().ContainSingle(static log =>
+            log.ProviderName == "mock_security"
+            && log.RawPayload.Contains("\"error\":\"provider_not_registered\"", StringComparison.Ordinal));
+    }
+
     private static ServiceProvider BuildServices(
         IReadOnlyList<ProviderDescriptor> descriptors,
         Action<IServiceCollection> configure)
@@ -109,14 +170,14 @@ public sealed class PropertyEnrichmentModuleTests
         return services.BuildServiceProvider();
     }
 
-    private static ProviderDescriptor Descriptor(string providerId, bool enabled, string capability) => new()
+    private static ProviderDescriptor Descriptor(string providerId, bool enabled, string capability, double timeoutSeconds = 5) => new()
     {
         ProviderId = providerId,
         DisplayName = providerId,
         Enabled = enabled,
         Capabilities = [capability],
         CacheTtl = TimeSpan.FromDays(30),
-        Timeout = TimeSpan.FromSeconds(5),
+        Timeout = TimeSpan.FromSeconds(timeoutSeconds),
         SourceType = SourceType.Imported,
         Version = "1.0.0",
     };
@@ -177,6 +238,20 @@ public sealed class PropertyEnrichmentModuleTests
                 },
                 RawPayload = "{\"crimeRatePer100k\":95,\"yoyChangePct\":-2,\"securityTrend\":\"Improving\"}",
             });
+        }
+    }
+
+    private sealed class TimedOutCrimeProvider(string providerName) : IDataProvider<CrimeData>
+    {
+        public string ProviderName => providerName;
+        public TimeSpan CacheTtl => TimeSpan.FromDays(1);
+        public int CallCount { get; private set; }
+
+        public async Task<ProviderFetchResult<CrimeData>> FetchAsync(PropertyAddress address, CancellationToken ct = default)
+        {
+            CallCount++;
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            throw new InvalidOperationException("Task.Delay with cancellation should not complete successfully");
         }
     }
 
