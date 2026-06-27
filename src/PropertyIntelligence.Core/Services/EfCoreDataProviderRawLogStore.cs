@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
@@ -11,10 +12,14 @@ namespace PropertyIntelligence.Core.Services;
 public sealed class EfCoreDataProviderRawLogStore : IDataProviderRawLogStore
 {
     private readonly PropertyIntelligenceDbContext _dbContext;
+    private readonly ILogger<EfCoreDataProviderRawLogStore> _logger;
 
-    public EfCoreDataProviderRawLogStore(PropertyIntelligenceDbContext dbContext)
+    public EfCoreDataProviderRawLogStore(
+        PropertyIntelligenceDbContext dbContext,
+        ILogger<EfCoreDataProviderRawLogStore> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     public async Task SaveAsync(IReadOnlyList<DataProviderRawLog> logs, CancellationToken ct = default)
@@ -24,7 +29,17 @@ public sealed class EfCoreDataProviderRawLogStore : IDataProviderRawLogStore
             return;
         }
 
-        _dbContext.DataProviderRawLogs.AddRange(logs);
-        await _dbContext.SaveChangesAsync(ct);
+        try
+        {
+            _dbContext.DataProviderRawLogs.AddRange(logs);
+            await _dbContext.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to persist {Count} provider raw logs. Continuing request without blocking analysis.",
+                logs.Count);
+        }
     }
 }

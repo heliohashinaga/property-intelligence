@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using NRules;
+using NRules.Fluent;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -10,8 +12,10 @@ using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 using PropertyIntelligence.Core.Services;
+using PropertyIntelligence.Explainability;
 using PropertyIntelligence.Providers.Mock;
 using PropertyIntelligence.Providers.Registry;
+using PropertyIntelligence.Rules;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,8 +36,10 @@ var databaseUrl = builder.Configuration["DATABASE_URL"]
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? "Host=localhost;Database=property_intelligence;Username=property_intelligence;Password=property_intelligence";
 
+var databaseConnectionString = NormalizePostgresConnectionString(databaseUrl);
+
 builder.Services.AddDbContext<PropertyIntelligenceDbContext>(opts =>
-    opts.UseNpgsql(databaseUrl,
+    opts.UseNpgsql(databaseConnectionString,
         npgsql => npgsql.UseNetTopologySuite()),
     ServiceLifetime.Scoped);
 
@@ -62,16 +68,20 @@ builder.Services.AddSingleton<IProviderRegistry>(sp =>
 builder.Services.AddScoped<IDataProviderRawLogStore, EfCoreDataProviderRawLogStore>();
 builder.Services.AddScoped<PropertyEnrichmentModule>();
 
-// ── Mock providers (T018–T025) ─────────────────────────────────────────────
-// Conditionally register mock providers when Providers:Profile == "mock".
-// Marco 2 (T026) will wire the enrichment module to call these adapters.
-var providerProfile = builder.Configuration["Providers:Profile"]
-    ?? Environment.GetEnvironmentVariable("PROVIDERS_PROFILE");
-
-if (providerProfile == "mock")
+builder.Services.AddSingleton<ISessionFactory>(_ =>
 {
-    builder.Services.AddMockProviders();
-}
+    var repository = new RuleRepository();
+    repository.Load(x => x.From(typeof(PropertyAnalysisEngine).Assembly));
+    return repository.Compile();
+});
+builder.Services.AddScoped<IPropertyAnalysisEngine, PropertyAnalysisEngine>();
+builder.Services.AddHttpClient<IExplainabilityService, LlmExplainabilityService>();
+
+// ── Mock providers (T018–T025) ─────────────────────────────────────────────
+// Always register mock providers in this MVP slice so contract tests and local
+// development can run without external dependencies. Provider registry controls
+// which entries are enabled at runtime.
+builder.Services.AddMockProviders();
 
 // ── OpenTelemetry — OTLP exporter (T039 will wire remaining instrumentations) ─
 var otlpEndpoint = builder.Configuration["GRAFANA_OTLP_ENDPOINT"]
@@ -166,9 +176,44 @@ app.UseMiddleware<ApiKeyAuthMiddleware>();
 
 // ── Endpoints ────────────────────────────────────────────────────────────────
 app.MapHealthEndpoint();
+app.MapAnalyzeEndpoint();
 
-// TODO T039: register all providers, engine, enrichment module, explainability service
+// TODO T039: complete production DI registrations for all real providers and orchestrations
 
 app.Run();
+
+static string NormalizePostgresConnectionString(string value)
+{
+    if (value.StartsWith("Host=", StringComparison.OrdinalIgnoreCase))
+    {
+        return value;
+    }
+
+    if (value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+        || value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(value);
+        var userInfo = uri.UserInfo.Split(':', 2);
+
+        var username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty;
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+        var database = uri.AbsolutePath.Trim('/');
+
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.IsDefaultPort ? 5432 : uri.Port,
+            Username = username,
+            Password = password,
+            Database = database,
+            SslMode = Npgsql.SslMode.Disable,
+            TrustServerCertificate = true,
+        };
+
+        return builder.ConnectionString;
+    }
+
+    return value;
+}
 
 public partial class Program { }
