@@ -15,6 +15,7 @@ using PropertyIntelligence.Core.Services;
 using PropertyIntelligence.Explainability;
 using PropertyIntelligence.Providers.Mock;
 using PropertyIntelligence.Providers.Registry;
+using PropertyIntelligence.Providers.Shared;
 using PropertyIntelligence.Rules;
 using StackExchange.Redis;
 
@@ -67,6 +68,12 @@ builder.Services.AddSingleton<IProviderRegistry>(sp =>
 
 builder.Services.AddScoped<IDataProviderRawLogStore, EfCoreDataProviderRawLogStore>();
 builder.Services.AddScoped<PropertyEnrichmentModule>();
+
+// ── Cache service (T039) ──────────────────────────────────────────────────────
+builder.Services.AddSingleton<ICacheService>(sp =>
+    new CacheService(
+        sp.GetRequiredService<IConnectionMultiplexer>(),
+        sp.GetRequiredService<ILogger<CacheService>>()));
 
 builder.Services.AddSingleton<ISessionFactory>(_ =>
 {
@@ -178,7 +185,19 @@ app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.MapHealthEndpoint();
 app.MapAnalyzeEndpoint();
 
-// TODO T039: complete production DI registrations for all real providers and orchestrations
+// ── Startup validation (T039) ─────────────────────────────────────────────────
+var providerRegistry = app.Services.GetRequiredService<IProviderRegistry>();
+var enabledProvidersCount = providerRegistry.GetEnabled().Count();
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+startupLogger.LogInformation(
+    "Application startup: {EnabledProviderCount} data providers enabled from registry",
+    enabledProvidersCount);
+
+if (enabledProvidersCount == 0)
+{
+    startupLogger.LogWarning(
+        "No providers enabled in registry. Service will fail to enrich properties.");
+}
 
 app.Run();
 
