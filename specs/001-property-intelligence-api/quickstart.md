@@ -6,6 +6,24 @@ Validated path from zero to a running **mock-provider-first** analysis response,
 
 ---
 
+## ⚡ Quick Start: System Check
+
+Before any step, detect your machine's optimal tier for delegating work:
+
+```bash
+# Detect tier (SINGLE/SEMI/FULL based on RAM + cores)
+./scripts/detect-orchestration-tier.sh
+
+# Validate system (memory, swap, disk, git clean)
+./scripts/pre-delegation-check.sh
+```
+
+**For this notebook (3.7 GB RAM)**: Use **TIER=single** (sequential execution, 16 min total, 3.5 GB peak, zero OOM).
+
+See [ORCHESTRATION-GUIDE.md](../../ORCHESTRATION-GUIDE.md) for full patterns + troubleshooting.
+
+---
+
 ## Prerequisites
 
 - .NET 10 SDK installed (`dotnet --version` → `10.x`)

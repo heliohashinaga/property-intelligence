@@ -77,6 +77,38 @@
 
 ---
 
+## Orchestration & Resource Management
+
+Before delegating parallel work to subagents, always detect your machine's optimal tier:
+
+```bash
+# Step 1: Detect tier (SINGLE/SEMI/FULL based on RAM + cores)
+./scripts/detect-orchestration-tier.sh
+
+# Step 2: Validate system before delegation (memory, swap, disk, git clean)
+./scripts/pre-delegation-check.sh
+```
+
+**For this notebook (3.7 GB RAM)**:
+- **TIER=single**: Sequential execution, `dotnet clean` between tasks
+- Time: ~16 min | Peak memory: 3.5 GB | Zero OOM crashes
+
+**For medium machines (4-8 GB RAM)**:
+- **TIER=semi**: Scout in parallel with first worker, then sequential dependent tasks
+- Time: ~12 min | Peak memory: 4.0 GB
+
+**For CI/Cloud (8+ GB RAM, 4+ cores)**:
+- **TIER=full**: All workers in parallel with git worktrees (GitHub Actions, etc.)
+- Time: ~7 min | Peak memory: 7.8 GB | Maximum parallelism
+
+**References**:
+- [ORCHESTRATION-GUIDE.md](ORCHESTRATION-GUIDE.md) — Quickstart + examples
+- [docs/orchestration-strategy.md](docs/orchestration-strategy.md) — Design + rationale
+- `/skill:adaptive-orchestration` — Global skill for tier-aware orchestration
+- [AGENTS.md](AGENTS.md) — Multi-agent execution standards
+
+---
+
 ## Execução Local
 
 ```sh

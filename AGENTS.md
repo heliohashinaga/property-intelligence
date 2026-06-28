@@ -112,6 +112,12 @@ it via `/skill:multi-agent-orchestration` when planning or delegating.
 - **Don't orchestrate when it doesn't pay.** For ≤4 tight-coupled tasks in one
   commit, implement directly; use read-only subagents for context/review only.
   See the skill's "When subagent orchestration does NOT pay" section.
+- **Adaptive tier selection before delegation.** This repository uses memory-aware
+  orchestration: run `./scripts/detect-orchestration-tier.sh` to determine
+  TIER (single/semi/full), then `./scripts/pre-delegation-check.sh` to validate
+  system health. **For this notebook (3.7 GB): Always use TIER=single**
+  (sequential execution, 16 min total, 3.5 GB peak, zero OOM). References:
+  `/skill:adaptive-orchestration`, `ORCHESTRATION-GUIDE.md`, `docs/orchestration-strategy.md`.
 
 ---
 
