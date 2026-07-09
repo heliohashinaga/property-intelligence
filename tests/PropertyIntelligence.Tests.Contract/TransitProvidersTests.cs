@@ -39,7 +39,8 @@ namespace PropertyIntelligence.Tests.Contract
             using var officialServer = WireMockServer.Start(port: 0);
             using var overpassServer = WireMockServer.Start(port: 0);
 
-            var csv = await File.ReadAllTextAsync("Fixtures/Transit/official_sptrans_sampacsv.csv");
+            var csvPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "Transit", "official_sptrans_sampacsv.csv");
+            var csv = await File.ReadAllTextAsync(csvPath);
             officialServer.Given(Request.Create().WithPath("/sptrans/stops.csv").UsingGet())
                 .RespondWith(Response.Create().WithHeader("Content-Type", "text/csv").WithBody(csv).WithStatusCode(200));
 
