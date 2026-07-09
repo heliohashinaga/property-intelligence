@@ -3,6 +3,8 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Globalization;
+using System.Text;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 
@@ -109,6 +111,25 @@ namespace PropertyIntelligence.Providers.ViaCep
                 var uf = root.TryGetProperty("uf", out var u) && u.ValueKind == JsonValueKind.String ? u.GetString() : null;
                 var returnedCep = root.TryGetProperty("cep", out var cp) && cp.ValueKind == JsonValueKind.String ? cp.GetString() : null;
 
+                // Validate locality (cidade) and state (UF) against requested address.
+                // City: case-insensitive + accent-insensitive comparison.
+                // UF: trimmed, case-insensitive comparison.
+                if (!string.IsNullOrWhiteSpace(localidade) && !string.IsNullOrWhiteSpace(uf)
+                    && !string.IsNullOrWhiteSpace(address.City) && !string.IsNullOrWhiteSpace(address.State))
+                {
+                    var normalizedLocalidade = RemoveDiacritics(localidade).ToLowerInvariant().Trim();
+                    var normalizedRequestedCity = RemoveDiacritics(address.City).ToLowerInvariant().Trim();
+
+                    var normalizedUf = (uf ?? string.Empty).Trim();
+                    var normalizedRequestedUf = (address.State ?? string.Empty).Trim();
+
+                    if (!string.Equals(normalizedLocalidade, normalizedRequestedCity, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(normalizedUf, normalizedRequestedUf, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException($"ViaCEP returned localidade='{localidade}' uf='{uf}' which does not match requested address (city='{address.City}', state='{address.State}').");
+                    }
+                }
+
                 var normalized = address.NormalizedAddress;
                 if (!string.IsNullOrWhiteSpace(logradouro) && !string.IsNullOrWhiteSpace(localidade) && !string.IsNullOrWhiteSpace(uf))
                 {
@@ -139,6 +160,20 @@ namespace PropertyIntelligence.Providers.ViaCep
             {
                 throw new InvalidOperationException("Failed to parse ViaCEP response", ex);
             }
+        }
+
+        private static string RemoveDiacritics(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+            var normalized = input.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(normalized.Length);
+            foreach (var c in normalized)
+            {
+                var uc = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (uc != UnicodeCategory.NonSpacingMark)
+                    sb.Append(c);
+            }
+            return sb.ToString().Normalize(NormalizationForm.FormC);
         }
     }
 }
