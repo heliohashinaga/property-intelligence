@@ -23,7 +23,7 @@ namespace PropertyIntelligence.Tests.Contract
             };
 
             var provider = new AnaFloodRiskProvider(executor);
-            var address = new PropertyAddress { Lat = -23.55, Lng = -46.63 };
+            var address = new PropertyAddress { NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = -23.55, Lng = -46.63 };
 
             var result = await provider.FetchAsync(address);
 
@@ -43,7 +43,7 @@ namespace PropertyIntelligence.Tests.Contract
             };
 
             var provider = new AnaFloodRiskProvider(executor);
-            var address = new PropertyAddress { Lat = -23.55, Lng = -46.63 };
+            var address = new PropertyAddress { NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = -23.55, Lng = -46.63 };
 
             var result = await provider.FetchAsync(address);
 
@@ -63,7 +63,7 @@ namespace PropertyIntelligence.Tests.Contract
             };
 
             var provider = new AnaFloodRiskProvider(executor);
-            var address = new PropertyAddress { Lat = null, Lng = null };
+            var address = new PropertyAddress { NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = null, Lng = null };
 
             await Assert.ThrowsAsync<InvalidOperationException>(async () => await provider.FetchAsync(address));
             Assert.False(called, "Executor should not have been invoked when coordinates are missing");
