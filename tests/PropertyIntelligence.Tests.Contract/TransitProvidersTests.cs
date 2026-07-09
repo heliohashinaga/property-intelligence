@@ -60,5 +60,43 @@ namespace PropertyIntelligence.Tests.Contract
             Assert.True(result.Data.TransitStops500m > 0);
         }
 
+        [Fact]
+        public async Task OverpassPoiFallbackProvider_WhenOfficialCoverageIsUnavailable_ReturnsSupplementalMobilityPoisFromOverpassStub()
+        {
+            using var overpassServer = WireMockServer.Start(port: 0);
+            var jsonPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "Transit", "overpass_pois_praca_da_se.json");
+            var json = await File.ReadAllTextAsync(jsonPath);
+
+            overpassServer.Given(Request.Create().WithPath("/api/interpreter").UsingGet())
+                .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", "application/json").WithBody(json));
+
+            using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
+            var provider = new PropertyIntelligence.Providers.Transit.OverpassPoiFallbackProvider(overHttp);
+
+            var address = new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = -23.55052, Lng = -46.633308 };
+            var result = await provider.FetchAsync(address);
+
+            Assert.NotNull(result.RawPayload);
+            Assert.True(result.Data.TransitStops500m > 0);
+            Assert.True(overpassServer.LogEntries.Count > 0);
+        }
+
+        [Fact]
+        public async Task OverpassPoiFallbackProvider_WithoutCoordinates_ThrowsValidationErrorBeforeHttpCall()
+        {
+            using var overpassServer = WireMockServer.Start(port: 0);
+            overpassServer.Given(Request.Create().WithPath("/api/interpreter").UsingGet())
+                .RespondWith(Response.Create().WithStatusCode(200).WithBody("{}"));
+
+            using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
+            var provider = new PropertyIntelligence.Providers.Transit.OverpassPoiFallbackProvider(overHttp);
+
+            var address = new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = null, Lng = null };
+
+            await Assert.ThrowsAsync<ArgumentException>(async () => await provider.FetchAsync(address));
+            // no HTTP calls should have been made
+            Assert.Empty(overpassServer.LogEntries);
+        }
+
     }
 }

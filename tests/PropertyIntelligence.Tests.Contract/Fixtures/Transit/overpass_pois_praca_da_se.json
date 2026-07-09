@@ -1,0 +1,8 @@
+{
+  "version": 0.6,
+  "elements": [
+    { "type": "node", "id": 1, "lat": -23.5506, "lon": -46.6333, "tags": { "highway": "bus_stop", "name": "Ponto A" } },
+    { "type": "node", "id": 2, "lat": -23.5507, "lon": -46.6335, "tags": { "amenity": "pharmacy", "name": "Drogaria" } },
+    { "type": "node", "id": 3, "lat": -23.5520, "lon": -46.6350, "tags": { "leisure": "park", "name": "Parque X" } }
+  ]
+}
