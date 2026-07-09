@@ -16,7 +16,8 @@ namespace PropertyIntelligence.Tests.Contract
         public async Task SpTransGeoSampaTransitProvider_WithOfficialSaoPauloFixtures_ReturnsMobilityCountsAndRawPayload()
         {
             using var officialServer = WireMockServer.Start(port: 0);
-            var csv = await File.ReadAllTextAsync("Fixtures/Transit/official_sptrans_sampacsv.csv");
+            var csvPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "Transit", "official_sptrans_sampacsv.csv");
+            var csv = await File.ReadAllTextAsync(csvPath);
 
             officialServer.Given(Request.Create().WithPath("/sptrans/stops.csv").UsingGet())
                 .RespondWith(Response.Create().WithHeader("Content-Type", "text/csv").WithBody(csv).WithStatusCode(200));
@@ -43,7 +44,7 @@ namespace PropertyIntelligence.Tests.Contract
                 .RespondWith(Response.Create().WithHeader("Content-Type", "text/csv").WithBody(csv).WithStatusCode(200));
 
             overpassServer.Given(Request.Create().WithPath("/api/interpreter").UsingGet())
-                .RespondWith(Response.Create().WithStatusCode(200).WithBody(File.ReadAllText("Fixtures/Transit/overpass_pois.geojson")));
+                .RespondWith(Response.Create().WithStatusCode(200).WithBody(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "Transit", "overpass_pois.geojson"))));
 
             using var http = new HttpClient { BaseAddress = new Uri(officialServer.Urls[0]) };
             using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
