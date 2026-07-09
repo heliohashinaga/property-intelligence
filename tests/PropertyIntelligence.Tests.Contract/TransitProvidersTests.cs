@@ -25,7 +25,7 @@ namespace PropertyIntelligence.Tests.Contract
 
             // Expectation: provider exists and parses CSV into counts + raw payload
             var provider = new PropertyIntelligence.Providers.Transit.SpTransGeoSampaTransitProvider(http);
-            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "01001-000" });
+            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP" });
 
             Assert.NotNull(result.RawPayload);
             Assert.True(result.Data.MobilityStopsCount > 0);
@@ -48,7 +48,7 @@ namespace PropertyIntelligence.Tests.Contract
             using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
 
             var provider = new PropertyIntelligence.Providers.Transit.SpTransGeoSampaTransitProvider(http, overHttp);
-            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "01001-000" });
+            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP" });
 
             // should not call overpass when official coverage present
             Assert.True(officialServer.LogEntries.Count > 0);
@@ -68,7 +68,7 @@ namespace PropertyIntelligence.Tests.Contract
             using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
 
             var provider = new PropertyIntelligence.Providers.Transit.OverpassPoiFallbackProvider(overHttp);
-            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "99999-999" });
+            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "99999-999", NormalizedAddress = "Unknown, São Paulo - SP", City = "São Paulo", State = "SP" });
 
             Assert.NotNull(result.Data);
             Assert.True(result.Data.Pois.Count > 0);
@@ -86,7 +86,7 @@ namespace PropertyIntelligence.Tests.Contract
             using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
 
             var provider = new PropertyIntelligence.Providers.Transit.OverpassPoiFallbackProvider(overHttp);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.FetchAsync(new Core.Domain.PropertyAddress { /* no coords, no cep */ }));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.FetchAsync(new Core.Domain.PropertyAddress { NormalizedAddress = "Unknown", City = "Unknown", State = "XX" }));
 
             // Ensure no HTTP calls happened
             Assert.Empty(overpassServer.LogEntries);
