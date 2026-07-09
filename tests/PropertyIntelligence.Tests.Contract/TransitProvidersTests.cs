@@ -25,10 +25,11 @@ namespace PropertyIntelligence.Tests.Contract
 
             // Expectation: provider exists and parses CSV into counts + raw payload
             var provider = new PropertyIntelligence.Providers.Transit.SpTransGeoSampaTransitProvider(http);
-            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP" });
+            var address = new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = -23.55052, Lng = -46.633308 };
+            var result = await provider.FetchAsync(address);
 
             Assert.NotNull(result.RawPayload);
-            Assert.True(result.Data.MobilityStopsCount > 0);
+            Assert.True(result.Data.TransitStops500m > 0);
         }
 
         [Fact]
@@ -48,12 +49,13 @@ namespace PropertyIntelligence.Tests.Contract
             using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
 
             var provider = new PropertyIntelligence.Providers.Transit.SpTransGeoSampaTransitProvider(http, overHttp);
-            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP" });
+            var address = new Core.Domain.PropertyAddress { PostalCode = "01001-000", NormalizedAddress = "Praça da Sé, São Paulo - SP", City = "São Paulo", State = "SP", Lat = -23.55052, Lng = -46.633308 };
+            var result = await provider.FetchAsync(address);
 
             // should not call overpass when official coverage present
             Assert.True(officialServer.LogEntries.Count > 0);
             Assert.Empty(overpassServer.LogEntries);
-            Assert.True(result.Data.MobilityStopsCount > 0);
+            Assert.True(result.Data.TransitStops500m > 0);
         }
 
         [Fact]
