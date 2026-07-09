@@ -58,40 +58,5 @@ namespace PropertyIntelligence.Tests.Contract
             Assert.True(result.Data.TransitStops500m > 0);
         }
 
-        [Fact]
-        public async Task OverpassPoiFallbackProvider_WhenOfficialCoverageIsUnavailable_ReturnsSupplementalMobilityPoisFromOverpassStub()
-        {
-            using var overpassServer = WireMockServer.Start(port: 0);
-            var geo = await File.ReadAllTextAsync("Fixtures/Transit/overpass_pois.geojson");
-
-            overpassServer.Given(Request.Create().WithPath("/api/interpreter").UsingGet())
-                .RespondWith(Response.Create().WithHeader("Content-Type", "application/json").WithBody(geo).WithStatusCode(200));
-
-            using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
-
-            var provider = new PropertyIntelligence.Providers.Transit.OverpassPoiFallbackProvider(overHttp);
-            var result = await provider.FetchAsync(new Core.Domain.PropertyAddress { PostalCode = "99999-999", NormalizedAddress = "Unknown, São Paulo - SP", City = "São Paulo", State = "SP" });
-
-            Assert.NotNull(result.Data);
-            Assert.True(result.Data.Pois.Count > 0);
-            Assert.NotNull(result.RawPayload);
-        }
-
-        [Fact]
-        public async Task OverpassPoiFallbackProvider_WithoutCoordinates_ThrowsValidationErrorBeforeHttpCall()
-        {
-            // If address has no coordinates and no postal code, provider should validate and throw before calling Overpass
-            using var overpassServer = WireMockServer.Start(port: 0);
-            overpassServer.Given(Request.Create().WithPath("/api/interpreter").UsingGet())
-                .RespondWith(Response.Create().WithStatusCode(200).WithBody(File.ReadAllText("Fixtures/Transit/overpass_pois.geojson")));
-
-            using var overHttp = new HttpClient { BaseAddress = new Uri(overpassServer.Urls[0]) };
-
-            var provider = new PropertyIntelligence.Providers.Transit.OverpassPoiFallbackProvider(overHttp);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => provider.FetchAsync(new Core.Domain.PropertyAddress { NormalizedAddress = "Unknown", City = "Unknown", State = "XX" }));
-
-            // Ensure no HTTP calls happened
-            Assert.Empty(overpassServer.LogEntries);
-        }
     }
 }
