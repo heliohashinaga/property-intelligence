@@ -130,7 +130,7 @@ namespace PropertyIntelligence.Providers.Transit
                 Parks1km = parks1k
             };
 
-            return new ProviderFetchResult<PoiData>(data, body);
+            return new ProviderFetchResult<PoiData> { Data = data, RawPayload = body };
         }
 
         private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
