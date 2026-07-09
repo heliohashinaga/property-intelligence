@@ -20,11 +20,20 @@ namespace PropertyIntelligence.Providers.ViaCep
     {
         private readonly HttpClient _httpClient;
         private readonly TimeSpan _cacheTtl;
+        private readonly IAddressCoordinateResolver? _localResolver;
+        private readonly HttpClient? _nominatimClient;
 
         public ViaCepAddressProvider(HttpClient httpClient, TimeSpan cacheTtl)
+            : this(httpClient, cacheTtl, null, null)
+        {
+        }
+
+        public ViaCepAddressProvider(HttpClient httpClient, TimeSpan cacheTtl, IAddressCoordinateResolver? localResolver = null, HttpClient? nominatimClient = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _cacheTtl = cacheTtl;
+            _localResolver = localResolver;
+            _nominatimClient = nominatimClient;
         }
 
         /// <inheritdoc />
@@ -137,6 +146,79 @@ namespace PropertyIntelligence.Providers.ViaCep
                     normalized = $"{logradouro}{(string.IsNullOrWhiteSpace(address.StreetNumber) ? string.Empty : ", " + address.StreetNumber)} - {bairro ?? string.Empty}, {localidade} - {uf}";
                 }
 
+                // Start with any coordinates provided on the input address
+                double? resolvedLat = address.Lat;
+                double? resolvedLng = address.Lng;
+
+                // Resolve coordinates: prefer existing address coordinates, then local resolver, then Nominatim fallback (if configured).
+                // This is intentionally best-effort: failures must not break the provider.
+                try
+                {
+                    // 1) already provided coordinates or no postal code -> nothing to do
+                    if ((resolvedLat.HasValue && resolvedLng.HasValue) || string.IsNullOrWhiteSpace(returnedCep))
+                    {
+                        // nothing to do
+                    }
+                    else
+                    {
+                        // 2) local resolver
+                        if (_localResolver != null)
+                        {
+                            var resolved = await _localResolver.ResolveAsync(address, ct);
+                            if (resolved.Lat.HasValue && resolved.Lng.HasValue)
+                            {
+                                resolvedLat = resolved.Lat;
+                                resolvedLng = resolved.Lng;
+                            }
+                        }
+
+                        // 3) Nominatim fallback
+                        if ((!resolvedLat.HasValue || !resolvedLng.HasValue) && _nominatimClient != null)
+                        {
+                            // Build a q parameter that includes normalized address and state/country hints
+                            var q = string.IsNullOrWhiteSpace(normalized)
+                                ? $"{localidade} - {uf}, Brasil"
+                                : $"{normalized}, {localidade} - {uf}, Brasil";
+
+                            var uri = $"/search?format=jsonv2&limit=1&countrycodes=br&q={Uri.EscapeDataString(q)}";
+                            using var nomReq = new HttpRequestMessage(HttpMethod.Get, uri);
+                            // Nominatim strict UA requirement
+                            nomReq.Headers.UserAgent.ParseAdd("property-intelligence/1.0 (dev)");
+
+                            using var nomResp = await _nominatimClient.SendAsync(nomReq, HttpCompletionOption.ResponseHeadersRead, ct);
+                            if (nomResp.IsSuccessStatusCode)
+                            {
+                                var nomBody = await nomResp.Content.ReadAsStringAsync(ct);
+                                try
+                                {
+                                    using var nomDoc = JsonDocument.Parse(nomBody);
+                                    if (nomDoc.RootElement.ValueKind == JsonValueKind.Array && nomDoc.RootElement.GetArrayLength() > 0)
+                                    {
+                                        var first = nomDoc.RootElement[0];
+                                        if (first.TryGetProperty("lat", out var latProp) && first.TryGetProperty("lon", out var lonProp))
+                                        {
+                                            if (double.TryParse(latProp.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var nlat)
+                                                && double.TryParse(lonProp.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var nlng))
+                                            {
+                                                resolvedLat = nlat;
+                                                resolvedLng = nlng;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (JsonException)
+                                {
+                                    // ignore nominatim parse errors
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Geocoding failures must not break main provider contract; swallow.
+                }
+
                 var info = new AddressInfo
                 {
                     NormalizedAddress = normalized,
@@ -146,8 +228,8 @@ namespace PropertyIntelligence.Providers.ViaCep
                     City = localidade ?? address.City,
                     State = uf ?? address.State,
                     PostalCode = returnedCep ?? address.PostalCode,
-                    Lat = address.Lat,
-                    Lng = address.Lng,
+                    Lat = resolvedLat,
+                    Lng = resolvedLng,
                 };
 
                 return new ProviderFetchResult<AddressInfo>

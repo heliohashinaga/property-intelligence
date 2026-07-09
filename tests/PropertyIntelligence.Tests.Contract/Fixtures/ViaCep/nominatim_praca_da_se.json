@@ -1,0 +1,13 @@
+[
+  {
+    "place_id": 1,
+    "licence": "Data © OpenStreetMap contributors",
+    "boundingbox": ["-23.551","-23.550","-46.634","-46.633"],
+    "lat": "-23.55052",
+    "lon": "-46.633308",
+    "display_name": "Praça da Sé, Sé, São Paulo - SP, Brasil",
+    "class": "place",
+    "type": "square",
+    "importance": 0.5
+  }
+]

@@ -128,6 +128,119 @@ public sealed class ViaCepProviderTests
         server.LogEntries.Should().BeEmpty("invalid CEPs must be rejected before any external HTTP call");
     }
 
+    [Fact]
+    public async Task FetchAsync_WithLocalResolver_UsesLocalResolverAndDoesNotCallNominatim()
+    {
+        using var viaServer = WireMockServer.Start(port: 0);
+        using var nomServer = WireMockServer.Start(port: 0);
+        var fixture = await File.ReadAllTextAsync("Fixtures/ViaCep/01001000_happy.json");
+
+        viaServer.Given(Request.Create().WithPath("/ws/01001000/json/").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody(fixture)
+                .WithStatusCode(200));
+
+        // Nominatim configured but should NOT be called when local resolver has data
+        nomServer.Given(Request.Create().WithPath("/search").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody("[]")
+                .WithStatusCode(200));
+
+        using var http = new HttpClient { BaseAddress = new Uri(viaServer.Urls[0]) };
+        using var nomHttp = new HttpClient { BaseAddress = new Uri(nomServer.Urls[0]) };
+
+        var localMap = new System.Collections.Generic.Dictionary<string, (double Lat, double Lng)>
+        {
+            { "01001000", (-23.55052, -46.633308) }
+        };
+
+        var localResolver = new PropertyIntelligence.Providers.ViaCep.LocalCepCoordinateResolver(localMap);
+        var provider = new ViaCepAddressProvider(http, TimeSpan.FromDays(30), localResolver, nomHttp);
+        var address = RequestedSaoPauloAddress();
+
+        var result = await provider.FetchAsync(address);
+
+        result.Data.Lat.Should().BeApproximately(-23.55052, 0.00001);
+        result.Data.Lng.Should().BeApproximately(-46.633308, 0.00001);
+
+        nomServer.LogEntries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FetchAsync_WhenLocalResolverMisses_UsesNominatimFallback()
+    {
+        using var viaServer = WireMockServer.Start(port: 0);
+        using var nomServer = WireMockServer.Start(port: 0);
+        var fixture = await File.ReadAllTextAsync("Fixtures/ViaCep/01001000_happy.json");
+        var nomFixture = await File.ReadAllTextAsync("Fixtures/ViaCep/nominatim_praca_da_se.json");
+
+        viaServer.Given(Request.Create().WithPath("/ws/01001000/json/").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody(fixture)
+                .WithStatusCode(200));
+
+        nomServer.Given(Request.Create().WithPath("/search").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody(nomFixture)
+                .WithStatusCode(200));
+
+        using var http = new HttpClient { BaseAddress = new Uri(viaServer.Urls[0]) };
+        using var nomHttp = new HttpClient { BaseAddress = new Uri(nomServer.Urls[0]) };
+
+        var provider = new ViaCepAddressProvider(http, TimeSpan.FromDays(30), null, nomHttp);
+        var address = RequestedSaoPauloAddress();
+
+        var result = await provider.FetchAsync(address);
+
+        // Assert lat/lng extracted from nominatim fixture
+        result.Data.Lat.Should().BeApproximately(-23.55052, 0.00001);
+        result.Data.Lng.Should().BeApproximately(-46.633308, 0.00001);
+
+        // Verify nominatim was called with expected query params
+        nomServer.LogEntries.Should().ContainSingle();
+        var entry = nomServer.LogEntries[0];
+        entry.RequestMessage.Url.Should().Contain("format=jsonv2");
+        entry.RequestMessage.Url.Should().Contain("limit=1");
+        entry.RequestMessage.Url.Should().Contain("countrycodes=br");
+        entry.RequestMessage.Url.Should().Contain("Brasil");
+    }
+
+    [Fact]
+    public async Task FetchAsync_WhenGeocodingFails_ReturnsAddressInfoWithNullCoordinates()
+    {
+        using var viaServer = WireMockServer.Start(port: 0);
+        using var nomServer = WireMockServer.Start(port: 0);
+        var fixture = await File.ReadAllTextAsync("Fixtures/ViaCep/01001000_happy.json");
+
+        viaServer.Given(Request.Create().WithPath("/ws/01001000/json/").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody(fixture)
+                .WithStatusCode(200));
+
+        // Nominatim returns empty array -> geocoding failure
+        nomServer.Given(Request.Create().WithPath("/search").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody("[]")
+                .WithStatusCode(200));
+
+        using var http = new HttpClient { BaseAddress = new Uri(viaServer.Urls[0]) };
+        using var nomHttp = new HttpClient { BaseAddress = new Uri(nomServer.Urls[0]) };
+
+        var provider = new ViaCepAddressProvider(http, TimeSpan.FromDays(30), null, nomHttp);
+        var address = RequestedSaoPauloAddress();
+
+        var result = await provider.FetchAsync(address);
+
+        result.Data.Lat.Should().BeNull();
+        result.Data.Lng.Should().BeNull();
+    }
+
     private static PropertyAddress RequestedSaoPauloAddress() => new()
     {
         PostalCode = "01001-000",
