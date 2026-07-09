@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "amenity": "bus_stop", "name": "Ponto Extra" },
+      "geometry": { "type": "Point", "coordinates": [-46.650, -23.560] }
+    }
+  ]
+}

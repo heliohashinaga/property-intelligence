@@ -1,0 +1,3 @@
+stop_id,stop_name,latitude,longitude,lines
+1001,Estação Sé,-23.55052,-46.633308,LineA;LineB
+1002,Estação Consolação,-23.557,-46.661,LineC
