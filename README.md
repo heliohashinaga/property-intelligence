@@ -1,6 +1,6 @@
 # Property Intelligence
 
-> Plataforma aberta para análise e explicação multidimensional de imóveis brasileiros
+> Plataforma para análise e explicação multidimensional de imóveis brasileiros
 
 **Property Intelligence** é uma plataforma que recebe um endereço do Brasil e retorna:
 - Um score composto (0–1000) calculado em 6 dimensões: segurança, mobilidade, infraestrutura, risco ambiental, valorização e contexto urbano
