@@ -71,16 +71,18 @@ public sealed class TransitProvidersTests
         sptrans.GetProperty("stops").GetArrayLength().Should().Be(6);
         geosampa.GetProperty("stations").GetArrayLength().Should().Be(2);
 
-        server.LogEntries.Should().Contain(entry =>
-            entry.RequestMessage?.Method == "GET" &&
-            entry.RequestMessage.Path == "/sptrans/stops");
+        var requests = server.LogEntries
+            .Select(entry => new
+            {
+                Method = entry.RequestMessage?.Method,
+                Path = entry.RequestMessage?.Path,
+                Body = entry.RequestMessage?.Body,
+            })
+            .ToArray();
 
-        server.LogEntries.Should().Contain(entry =>
-            entry.RequestMessage?.Method == "GET" &&
-            entry.RequestMessage.Path == "/geosampa/stations");
-
-        server.LogEntries.Should().NotContain(entry =>
-            entry.RequestMessage?.Path == "/api/interpreter");
+        requests.Should().Contain(request => request.Method == "GET" && request.Path == "/sptrans/stops");
+        requests.Should().Contain(request => request.Method == "GET" && request.Path == "/geosampa/stations");
+        requests.Should().NotContain(request => request.Path == "/api/interpreter");
     }
 
     [Fact]
@@ -111,14 +113,22 @@ public sealed class TransitProvidersTests
         result.Data.Parks1km.Should().Be(1);
         result.Data.MobilityTrend.Should().BeNull();
 
-        server.LogEntries.Should().ContainSingle(entry =>
-            entry.RequestMessage?.Method == "POST" &&
-            entry.RequestMessage.Path == "/api/interpreter" &&
-            entry.RequestMessage.Body is not null &&
-            entry.RequestMessage.Body.Contains("around:500") &&
-            entry.RequestMessage.Body.Contains("around:1000") &&
-            entry.RequestMessage.Body.Contains("around:2000") &&
-            entry.RequestMessage.Body.Contains("\"highway\"=\"bus_stop\""));
+        var requests = server.LogEntries
+            .Select(entry => new
+            {
+                Method = entry.RequestMessage?.Method,
+                Path = entry.RequestMessage?.Path,
+                Body = entry.RequestMessage?.Body ?? string.Empty,
+            })
+            .ToArray();
+
+        requests.Should().ContainSingle(request =>
+            request.Method == "POST" &&
+            request.Path == "/api/interpreter" &&
+            request.Body.Contains("around:500", StringComparison.Ordinal) &&
+            request.Body.Contains("around:1000", StringComparison.Ordinal) &&
+            request.Body.Contains("around:2000", StringComparison.Ordinal) &&
+            request.Body.Contains("\"highway\"=\"bus_stop\"", StringComparison.Ordinal));
     }
 
     private static IDataProvider<PoiData> CreateProvider(string fullTypeName, HttpClient httpClient)
