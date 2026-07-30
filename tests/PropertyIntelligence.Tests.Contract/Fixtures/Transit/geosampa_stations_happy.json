@@ -1,0 +1,6 @@
+{
+  "stations": [
+    { "id": "geo-001", "name": "Sé", "mode": "metro", "distance_m": 180 },
+    { "id": "geo-002", "name": "Luz", "mode": "cptm", "distance_m": 920 }
+  ]
+}
