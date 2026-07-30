@@ -1,0 +1,51 @@
+{
+  "provider": "cnes",
+  "ttl_days": 7,
+  "query": {
+    "lat": -23.55052,
+    "lng": -46.633308,
+    "radius_metres": 2000
+  },
+  "facilities": [
+    {
+      "cnes_code": "1234567",
+      "facility_type": "hospital",
+      "distance_metres": 420.0
+    },
+    {
+      "cnes_code": "1234568",
+      "facility_type": "hospital",
+      "distance_metres": 1710.0
+    },
+    {
+      "cnes_code": "1234569",
+      "facility_type": "ubs",
+      "distance_metres": 320.0
+    },
+    {
+      "cnes_code": "1234570",
+      "facility_type": "ubs",
+      "distance_metres": 890.0
+    },
+    {
+      "cnes_code": "1234571",
+      "facility_type": "ubs",
+      "distance_metres": 1340.0
+    },
+    {
+      "cnes_code": "1234572",
+      "facility_type": "ubs",
+      "distance_metres": 1760.0
+    },
+    {
+      "cnes_code": "1234573",
+      "facility_type": "upa",
+      "distance_metres": 950.0
+    }
+  ],
+  "expected": {
+    "hospitals_within_2km": 2,
+    "clinics_within_2km": 4,
+    "emergency_units_2km": 1
+  }
+}

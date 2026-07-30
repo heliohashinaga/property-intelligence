@@ -1,0 +1,25 @@
+{
+  "provider": "ana_snirh",
+  "ttl_days": 30,
+  "query": {
+    "lat": -23.55052,
+    "lng": -46.633308
+  },
+  "zones": [
+    {
+      "risk_level": "moderate",
+      "distance_metres": 18.4,
+      "description": "Planície sujeita a alagamentos sazonais"
+    },
+    {
+      "risk_level": "high",
+      "distance_metres": 0.0,
+      "description": "Endereço dentro da área suscetível prioritária"
+    }
+  ],
+  "expected": {
+    "risk_level": "high",
+    "distance_metres": 0.0,
+    "trend": "Stable"
+  }
+}

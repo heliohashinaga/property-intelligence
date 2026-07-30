@@ -1,0 +1,33 @@
+{
+  "provider": "ssp_sp",
+  "ttl_hours": 24,
+  "municipality": "São Paulo",
+  "cutoff_year": 2024,
+  "records": [
+    {
+      "year": 2024,
+      "month": 6,
+      "crime_type": "roubo",
+      "count": 221,
+      "per_100k": 410.2
+    },
+    {
+      "year": 2025,
+      "month": 6,
+      "crime_type": "roubo",
+      "count": 214,
+      "per_100k": 397.1
+    },
+    {
+      "year": 2025,
+      "month": 6,
+      "crime_type": "furto",
+      "count": 241,
+      "per_100k": 448.2
+    }
+  ],
+  "expected": {
+    "crime_rate_per_100k": 845.3,
+    "yoy_change_pct": -3.1
+  }
+}

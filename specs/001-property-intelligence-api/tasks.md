@@ -115,7 +115,7 @@ and confirmed failing before each implementation task.
 
 - [x] T089 [P] [US1] Write provider contract test for `ViaCepAddressProvider` in `tests/PropertyIntelligence.Tests.Contract/ViaCepProviderTests.cs`; stub ViaCEP response and locality validation flow; confirm FAILS before implementation
 - [x] T090 [P] [US1] Write provider contract tests for mobility providers in `tests/PropertyIntelligence.Tests.Contract/TransitProvidersTests.cs`; cover official São Paulo transport sources first (SPTrans/GeoSampa/Metrô/CPTM) and Overpass only as fallback/supplement; confirm FAILS
-- [ ] T091 [P] [US1] Write provider contract tests for public-data providers in `tests/PropertyIntelligence.Tests.Contract/PublicDataProvidersTests.cs`; cover ANA, IBGE, SSP-SP, CNES, INEP, and GeoSampa appreciation providers with deterministic fixtures; confirm FAILS
+- [x] T091 [P] [US1] Write provider contract tests for public-data providers in `tests/PropertyIntelligence.Tests.Contract/PublicDataProvidersTests.cs`; cover ANA, IBGE, SSP-SP, CNES, INEP, and GeoSampa appreciation providers with deterministic fixtures; confirm FAILS
 
 ### Implementation for US1 Real Public Sources
 

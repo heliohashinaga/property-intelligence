@@ -1,0 +1,20 @@
+{
+  "provider": "ibge_census",
+  "ttl_days": 30,
+  "query": {
+    "lat": -23.55052,
+    "lng": -46.633308
+  },
+  "sector": {
+    "sector_code": "355030885000001",
+    "median_income_group": 8,
+    "population_density": 12345.67,
+    "working_age_pct": 69.4,
+    "census_year": 2022
+  },
+  "expected": {
+    "median_income_group": 8,
+    "population_density": 12345.67,
+    "working_age_pct": 69.4
+  }
+}
