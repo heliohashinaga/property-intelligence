@@ -119,7 +119,7 @@ and confirmed failing before each implementation task.
 
 ### Implementation for US1 Real Public Sources
 
-- [ ] T092 [P] [US1] Implement `ViaCepAddressProvider` in `src/PropertyIntelligence.Providers/ViaCep/ViaCepAddressProvider.cs`; call `viacep.com.br/ws/{cep}/json/`, validate municipality/state via IBGE/local rules, and resolve coordinates from local/open São Paulo sources first; use public Nominatim only as low-volume fallback during MVP experimentation
+- [x] T092 [P] [US1] Implement `ViaCepAddressProvider` in `src/PropertyIntelligence.Providers/ViaCep/ViaCepAddressProvider.cs`; call `viacep.com.br/ws/{cep}/json/`, validate municipality/state via IBGE/local rules, and resolve coordinates from local/open São Paulo sources first; use public Nominatim only as low-volume fallback during MVP experimentation
 - [ ] T093 [P] [US1] Implement `SpTransGeoSampaTransitProvider` in `src/PropertyIntelligence.Providers/Transit/SpTransGeoSampaTransitProvider.cs`; consume official/open São Paulo transport datasets (SPTrans GTFS, GeoSampa transport layers, Metrô/CPTM station layers where available); cache 7 days
 - [ ] T094 [P] [US1] Implement `OverpassPoiFallbackProvider` in `src/PropertyIntelligence.Providers/Overpass/OverpassPoiFallbackProvider.cs`; use Overpass only as fallback/supplementary POI source for mobility/infrastructure gaps; cache 7 days
 - [ ] T095 [P] [US1] Implement `AnaFloodRiskProvider` in `src/PropertyIntelligence.Providers/Ana/AnaFloodRiskProvider.cs`; execute PostGIS `ST_Intersects(geometry, ST_SetSRID(ST_MakePoint(:lng,:lat),4326))` against `flood_risk_zones`; return highest `risk_level` found (null if no zone); cache 30 days
