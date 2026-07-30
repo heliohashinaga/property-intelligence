@@ -110,6 +110,68 @@ public sealed class ViaCepProviderTests
             .WithMessage("*CEP 99999999 not found in ViaCEP*");
     }
 
+    [Fact]
+    public async Task FetchAsync_WhenAddressAlreadyHasCoordinates_PreservesThemWithoutCallingFallbackGeocoders()
+    {
+        using var viaCepServer = WireMockServer.Start(port: 0);
+        using var saoPauloServer = WireMockServer.Start(port: 0);
+        using var nominatimServer = WireMockServer.Start(port: 0);
+        var fixture = await File.ReadAllTextAsync("Fixtures/ViaCep/01001000_happy.json");
+
+        viaCepServer.Given(Request.Create().WithPath("/ws/01001000/json/").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody(fixture)
+                .WithStatusCode(200));
+
+        using var viaCepHttp = new HttpClient { BaseAddress = new Uri(viaCepServer.Urls[0]) };
+        using var saoPauloHttp = new HttpClient { BaseAddress = new Uri(saoPauloServer.Urls[0]) };
+        using var nominatimHttp = new HttpClient { BaseAddress = new Uri(nominatimServer.Urls[0]) };
+        var provider = new ViaCepAddressProvider(viaCepHttp, TimeSpan.FromDays(30), saoPauloHttp, nominatimHttp);
+        var address = RequestedSaoPauloAddress() with { Lat = -23.55052, Lng = -46.633308 };
+
+        var result = await provider.FetchAsync(address);
+
+        result.Data.Lat.Should().Be(-23.55052);
+        result.Data.Lng.Should().Be(-46.633308);
+        saoPauloServer.LogEntries.Should().BeEmpty();
+        nominatimServer.LogEntries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FetchAsync_WhenCoordinatesMissing_PrefersSaoPauloSourceBeforeNominatimFallback()
+    {
+        using var viaCepServer = WireMockServer.Start(port: 0);
+        using var saoPauloServer = WireMockServer.Start(port: 0);
+        using var nominatimServer = WireMockServer.Start(port: 0);
+        var fixture = await File.ReadAllTextAsync("Fixtures/ViaCep/01001000_happy.json");
+
+        viaCepServer.Given(Request.Create().WithPath("/ws/01001000/json/").UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody(fixture)
+                .WithStatusCode(200));
+
+        saoPauloServer.Given(Request.Create().UsingGet())
+            .RespondWith(Response.Create()
+                .WithHeader("Content-Type", "application/json; charset=utf-8")
+                .WithBody("""[{ "lat": -23.55052, "lon": -46.633308 }]""")
+                .WithStatusCode(200));
+
+        using var viaCepHttp = new HttpClient { BaseAddress = new Uri(viaCepServer.Urls[0]) };
+        using var saoPauloHttp = new HttpClient { BaseAddress = new Uri(saoPauloServer.Urls[0]) };
+        using var nominatimHttp = new HttpClient { BaseAddress = new Uri(nominatimServer.Urls[0]) };
+        var provider = new ViaCepAddressProvider(viaCepHttp, TimeSpan.FromDays(30), saoPauloHttp, nominatimHttp);
+        var address = RequestedSaoPauloAddress() with { Lat = null, Lng = null };
+
+        var result = await provider.FetchAsync(address);
+
+        result.Data.Lat.Should().Be(-23.55052);
+        result.Data.Lng.Should().Be(-46.633308);
+        saoPauloServer.LogEntries.Should().ContainSingle();
+        nominatimServer.LogEntries.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("123")]
     [InlineData("abcdefgh")]
