@@ -1,0 +1,10 @@
+{
+  "stops": [
+    { "id": "sp-001", "name": "Praça da Sé", "distance_m": 120 },
+    { "id": "sp-002", "name": "Boa Vista", "distance_m": 260 },
+    { "id": "sp-003", "name": "Largo São Francisco", "distance_m": 480 },
+    { "id": "sp-004", "name": "Anhangabaú", "distance_m": 760 },
+    { "id": "sp-005", "name": "Liberdade", "distance_m": 900 },
+    { "id": "sp-006", "name": "Pedro Lessa", "distance_m": 980 }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "provider": "inep",
+  "ttl_days": 30,
+  "query": {
+    "lat": -23.55052,
+    "lng": -46.633308,
+    "radius_metres": 2000
+  },
+  "schools": [
+    {
+      "inep_code": "35000123",
+      "ideb_score": 7.4,
+      "distance_metres": 280.0,
+      "type": "public"
+    },
+    {
+      "inep_code": "35000124",
+      "ideb_score": 6.9,
+      "distance_metres": 910.0,
+      "type": "public"
+    },
+    {
+      "inep_code": "35000125",
+      "ideb_score": 6.5,
+      "distance_metres": 1520.0,
+      "type": "public"
+    }
+  ],
+  "expected": {
+    "schools_within_2km": 3,
+    "nearest_school_ideb": 7.4
+  }
+}

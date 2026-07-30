@@ -1,0 +1,23 @@
+{
+  "provider": "geosampa_zoneamento",
+  "ttl_days": 30,
+  "query": {
+    "lat": -23.55052,
+    "lng": -46.633308
+  },
+  "zones": [
+    {
+      "zone_code": "ZEU",
+      "permissiveness_score": 100,
+      "future_transit_distance_metres": 550
+    }
+  ],
+  "cadastro": {
+    "valor_venal": 1250000.00,
+    "fiscal_year": 2026
+  },
+  "expected": {
+    "zoning_class": "ZEU",
+    "valor_venal": 1250000.00
+  }
+}

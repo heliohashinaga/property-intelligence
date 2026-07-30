@@ -1,0 +1,41 @@
+{
+  "version": 0.6,
+  "generator": "contract-test-fixture",
+  "elements": [
+    {
+      "type": "node",
+      "id": 1001,
+      "lat": -23.55052,
+      "lon": -46.633308,
+      "tags": { "highway": "bus_stop", "name": "Parada Sé 1" }
+    },
+    {
+      "type": "node",
+      "id": 1002,
+      "lat": -23.55052,
+      "lon": -46.633308,
+      "tags": { "railway": "station", "station": "subway", "name": "Estação Sé" }
+    },
+    {
+      "type": "node",
+      "id": 1003,
+      "lat": -23.55052,
+      "lon": -46.633308,
+      "tags": { "shop": "supermarket", "name": "Mercado Centro" }
+    },
+    {
+      "type": "node",
+      "id": 1004,
+      "lat": -23.55052,
+      "lon": -46.633308,
+      "tags": { "amenity": "pharmacy", "name": "Farmácia Centro" }
+    },
+    {
+      "type": "node",
+      "id": 1005,
+      "lat": -23.55052,
+      "lon": -46.633308,
+      "tags": { "leisure": "park", "name": "Praça da Sé" }
+    }
+  ]
+}
