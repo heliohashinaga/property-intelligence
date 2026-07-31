@@ -105,6 +105,10 @@ public sealed record IptuData
     public string? ZoningClass { get; init; }
     /// <summary>Trend direction populated in US2 (Phase 4). Null at MVP.</summary>
     public TrendDirection? AppreciationTrend { get; init; }
+    /// <summary>Distance in metres to the nearest confirmed future transit project. Null if not available.</summary>
+    public double? FutureTransitDistanceMetres { get; init; }
+    /// <summary>Zoning permissiveness score (1–5 where 5 = highest density allowed). Null if not available.</summary>
+    public int? ZoningPermissivenessScore { get; init; }
 }
 
 // ── PropertyProfile aggregate ─────────────────────────────────────────────────
@@ -130,6 +134,12 @@ public sealed record PropertyProfile
 
     /// <summary>Provider names that failed or timed out during enrichment.</summary>
     public required IReadOnlyList<string> ProvidersUnavailable { get; init; }
+
+    /// <summary>Provider names that successfully returned data during enrichment.</summary>
+    public IReadOnlyList<string> ProvidersUsed { get; init; } = [];
+
+    /// <summary>PT-BR warnings generated from unavailable providers. Stored as JSONB.</summary>
+    public IReadOnlyList<AnalysisWarning> Warnings { get; init; } = [];
 
     /// <summary>Whether ALL provider results were served from Redis cache.</summary>
     public bool AllFromCache { get; init; }

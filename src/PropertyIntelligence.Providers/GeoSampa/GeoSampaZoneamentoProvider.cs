@@ -172,7 +172,10 @@ public sealed class GeoSampaZoneamentoProvider : IDataProvider<IptuData>
         {
             ZoningClass = zoningClass,
             ValorVenal = valorVenal,
-            AppreciationTrend = null, // Populated in US2 (Phase 4)
+            // TODO: derive AppreciationTrend from multi-snapshot GeoSampa history once 2+ import snapshots available (T043)
+            AppreciationTrend = TrendDirection.Stable,
+            FutureTransitDistanceMetres = zone.FutureTransitDistanceMetres,
+            ZoningPermissivenessScore = zone.PermissivenessScore,
         };
 
         var rawPayload = JsonSerializer.Serialize(response);

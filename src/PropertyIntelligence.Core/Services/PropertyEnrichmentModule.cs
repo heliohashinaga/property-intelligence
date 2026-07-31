@@ -50,6 +50,23 @@ public sealed class PropertyEnrichmentModule
     }
 
     /// <summary>
+    /// Maps a provider ID to the scoring dimension it contributes data for.
+    /// Used to generate PT-BR warnings when a provider is unavailable.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ProviderToDimension =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ssp_sp"] = "security",
+            ["overpass"] = "mobility",
+            ["sptrans"] = "mobility",
+            ["ana_flood_risk"] = "environment",
+            ["geosampa_zoneamento"] = "appreciation",
+            ["ibge_census"] = "urban_context",
+            ["cnes"] = "infrastructure",
+            ["inep"] = "infrastructure",
+        };
+
+    /// <summary>
     /// Resolves enabled providers from the registry, executes them in parallel
     /// with per-provider timeouts, aggregates successful payloads into a
     /// <see cref="PropertyProfile"/>, and records raw payload logs for audit.
@@ -121,6 +138,12 @@ public sealed class PropertyEnrichmentModule
 
         await _rawLogStore.SaveAsync(rawLogs, ct);
 
+        var warnings = BuildWarnings(unavailableProviders);
+        var providersUsed = enabled
+            .Select(d => d.ProviderId)
+            .Where(id => !unavailableProviders.Contains(id, StringComparer.Ordinal))
+            .ToList();
+
         return new PropertyProfile
         {
             Address = address,
@@ -133,8 +156,24 @@ public sealed class PropertyEnrichmentModule
             SchoolData = schoolData,
             IptuData = iptuData,
             ProvidersUnavailable = unavailableProviders,
+            ProvidersUsed = providersUsed,
+            Warnings = warnings,
             AllFromCache = false,
         };
+    }
+
+    private static IReadOnlyList<AnalysisWarning> BuildWarnings(IReadOnlyList<string> unavailableProviders)
+    {
+        var warnings = new List<AnalysisWarning>(unavailableProviders.Count);
+        foreach (var provider in unavailableProviders)
+        {
+            if (ProviderToDimension.TryGetValue(provider, out var dimension))
+            {
+                warnings.Add(AnalysisWarning.ProviderUnavailable(provider, dimension));
+            }
+        }
+
+        return warnings;
     }
 
     private async Task<ProviderExecutionResult> ExecuteProviderAsync(

@@ -68,18 +68,86 @@ public sealed class PropertyAnalysisEngine : IPropertyAnalysisEngine
             CompositeMax = compositeMax,
             Grade = grade,
             DimensionScores = dimensionScores,
-            RiskFlags = [],
-            OpportunityFlags = [],
+            RiskFlags = BuildRiskFlags(profile, scoreByDimension),
+            OpportunityFlags = BuildOpportunityFlags(profile),
             Insight = null,
             InsightUnavailable = true,
             LlmModel = Environment.GetEnvironmentVariable("LLM_MODEL") ?? "unknown",
             RulesVersion = RulesVersion,
-            Warnings = [],
-            ProvidersUsed = [],
+            Warnings = profile.Warnings,
+            ProvidersUsed = profile.ProvidersUsed,
             ProvidersUnavailable = profile.ProvidersUnavailable,
             Cached = profile.AllFromCache,
             RequestIp = requestIp,
         };
+    }
+
+    private static IReadOnlyList<string> BuildRiskFlags(
+        PropertyProfile profile,
+        IReadOnlyDictionary<string, int> scoreByDimension)
+    {
+        var flags = new List<string>();
+
+        // Flood risk: moderate → "moderate_flood_risk"; high/critical → "high_flood_risk"
+        if (profile.FloodRisk?.RiskLevel is "critical" or "high")
+        {
+            flags.Add("high_flood_risk");
+        }
+        else if (profile.FloodRisk?.RiskLevel is "moderate")
+        {
+            flags.Add("moderate_flood_risk");
+        }
+
+        // Security trend worsening → "crime_trend_12m"
+        if (profile.CrimeData?.SecurityTrend == TrendDirection.Worsening)
+        {
+            flags.Add("crime_trend_12m");
+        }
+
+        // Low mobility score
+        if (scoreByDimension.TryGetValue("mobility", out var mobilityScore) && mobilityScore < 80)
+        {
+            flags.Add("low_mobility");
+        }
+
+        // No hospital within 2km (only flagged when health data was available)
+        if (profile.HealthData is not null && profile.HealthData.HospitalsWithin2km == 0)
+        {
+            flags.Add("no_hospital_2km");
+        }
+
+        return flags;
+    }
+
+    private static IReadOnlyList<string> BuildOpportunityFlags(PropertyProfile profile)
+    {
+        var flags = new List<string>();
+
+        // Confirmed future transit project within 1 km
+        if (profile.IptuData?.FutureTransitDistanceMetres is <= 1000)
+        {
+            flags.Add("metro_expansion_nearby");
+        }
+
+        // Zoning allows higher density (permissiveness score ≥ 3 out of 5)
+        if (profile.IptuData?.ZoningPermissivenessScore >= 3)
+        {
+            flags.Add("zoning_upscale");
+        }
+
+        // Appreciation trend improving
+        if (profile.IptuData?.AppreciationTrend == TrendDirection.Improving)
+        {
+            flags.Add("appreciation_trend_up");
+        }
+
+        // Nearest school IDEB ≥ 7.0 within 1 km
+        if (profile.SchoolData?.NearestSchoolIdeb >= 7.0)
+        {
+            flags.Add("school_excellence_1km");
+        }
+
+        return flags;
     }
 
     private static DimensionScore CreateDimensionScore(
