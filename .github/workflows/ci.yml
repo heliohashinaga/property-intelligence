@@ -101,6 +101,9 @@ jobs:
     needs: [integration-tests]
     if: github.ref == 'refs/heads/main'
     environment: production
+    permissions:
+      contents: read
+      packages: write  # needed to push to GHCR
 
     steps:
       - name: Checkout
