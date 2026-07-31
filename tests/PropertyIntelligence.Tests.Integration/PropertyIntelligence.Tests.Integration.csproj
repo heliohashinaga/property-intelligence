@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="FluentAssertions" Version="8.10.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.12.0" />
     <PackageReference Include="Testcontainers.Redis" Version="4.12.0" />
@@ -22,6 +23,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PropertyIntelligence.Api\PropertyIntelligence.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy migration SQL files so tests can apply them to Testcontainers -->
+    <None Update="..\..\infra\migrations\*.sql">
+      <Link>Migrations\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
