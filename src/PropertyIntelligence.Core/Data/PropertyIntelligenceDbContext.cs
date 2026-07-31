@@ -150,38 +150,38 @@ public sealed class PropertyIntelligenceDbContext : DbContext
                  v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                  v => JsonSerializer.Deserialize<List<AnalysisWarning>>(v, (JsonSerializerOptions?)null)!);
 
-            // text[] columns
+            // text[] columns — stored as JSONB for portability across providers
             e.Property(a => a.RiskFlags)
              .IsRequired()
-             .HasColumnType("text[]")
+             .HasColumnType("jsonb")
              .HasColumnName("risk_flags")
              .HasConversion(
-                 v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                 v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()));
 
             e.Property(a => a.OpportunityFlags)
              .IsRequired()
-             .HasColumnType("text[]")
+             .HasColumnType("jsonb")
              .HasColumnName("opportunity_flags")
              .HasConversion(
-                 v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                 v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()));
 
             e.Property(a => a.ProvidersUsed)
              .IsRequired()
-             .HasColumnType("text[]")
+             .HasColumnType("jsonb")
              .HasColumnName("providers_used")
              .HasConversion(
-                 v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                 v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()));
 
             e.Property(a => a.ProvidersUnavailable)
              .IsRequired()
-             .HasColumnType("text[]")
+             .HasColumnType("jsonb")
              .HasColumnName("providers_unavailable")
              .HasConversion(
-                 v => v.ToArray(),
-                 v => (IReadOnlyList<string>)v);
+                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                 v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()));
 
             e.Property(a => a.Insight).HasColumnName("insight");
             e.Property(a => a.InsightUnavailable)
@@ -201,7 +201,7 @@ public sealed class PropertyIntelligenceDbContext : DbContext
              .HasColumnName("cached")
              .HasDefaultValue(false);
             e.Property(a => a.RequestIp)
-             .HasColumnType("inet")
+             .HasColumnType("text")
              .HasColumnName("request_ip");
             e.Property(a => a.CreatedAt)
              .IsRequired()

@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 
@@ -23,13 +24,23 @@ public sealed class SpTransGeoSampaTransitProvider : IDataProvider<PoiData>
         PropertyNameCaseInsensitive = true,
     };
 
+    private static readonly TimeSpan SnapshotTtl = TimeSpan.FromDays(36 * 30);
+
     private readonly HttpClient _httpClient;
     private readonly TimeSpan _cacheTtl;
+    private readonly ICacheService _cacheService;
+    private readonly ILogger<SpTransGeoSampaTransitProvider> _logger;
 
-    public SpTransGeoSampaTransitProvider(HttpClient httpClient, TimeSpan cacheTtl)
+    public SpTransGeoSampaTransitProvider(
+        HttpClient httpClient,
+        TimeSpan cacheTtl,
+        ICacheService cacheService,
+        ILogger<SpTransGeoSampaTransitProvider> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _cacheTtl = cacheTtl;
+        _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public string ProviderName => "sptrans_geosampa";
@@ -70,17 +81,27 @@ public sealed class SpTransGeoSampaTransitProvider : IDataProvider<PoiData>
             .Select(static group => group.MinBy(item => item.Distance)!.Distance)
             .ToArray();
 
+        var stops500m = CountWithinRadius(allDistances, 500);
+        var stops1km = CountWithinRadius(allDistances, 1000);
+        var totalStops = stops1km;
+
+        // ── 24-month mobility trend via Redis snapshot (T079) ─────────────────
+        // Key stores total transit-stop count at last fetch; comparing against
+        // current count approximates the 24-month snapshot-based trend.
+        var snapshotKey = BuildSnapshotKey(address);
+        var mobilityTrend = await ComputeMobilityTrendAsync(snapshotKey, totalStops, ct);
+
         return new ProviderFetchResult<PoiData>
         {
             Data = new PoiData
             {
-                TransitStops500m = CountWithinRadius(allDistances, 500),
-                TransitStops1km = CountWithinRadius(allDistances, 1000),
+                TransitStops500m = stops500m,
+                TransitStops1km = stops1km,
                 Pois2km = 0,
                 Supermarkets1km = 0,
                 Pharmacies1km = 0,
                 Parks1km = 0,
-                MobilityTrend = null,
+                MobilityTrend = mobilityTrend,
             },
             RawPayload = BuildRawPayload(spTransBody, geoSampaBody),
         };
@@ -138,6 +159,70 @@ public sealed class SpTransGeoSampaTransitProvider : IDataProvider<PoiData>
 
     private static string NormalizeId(string? id, string? name)
         => string.IsNullOrWhiteSpace(id) ? name?.Trim() ?? Guid.NewGuid().ToString("N") : id.Trim();
+
+    /// <summary>
+    /// Derives transit snapshot key from provider name + coordinate hash so that
+    /// geographically-close addresses do not share the same snapshot bucket.
+    /// </summary>
+    private static string BuildSnapshotKey(PropertyAddress address)
+    {
+        var lat = address.Lat!.Value.ToString("F6", CultureInfo.InvariantCulture);
+        var lng = address.Lng!.Value.ToString("F6", CultureInfo.InvariantCulture);
+        var input = $"sptrans_geosampa:{lat},{lng}";
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(input));
+        var hash = Convert.ToHexString(bytes)[..16].ToLowerInvariant();
+        return $"sptrans_geosampa:trend_snapshot:{hash}";
+    }
+
+    /// <summary>
+    /// Reads the prior transit-stop snapshot from Redis, compares against the
+    /// current count, derives <see cref="TrendDirection"/>, and persists the
+    /// current count as the new snapshot.
+    ///
+    /// <para>Thresholds: &gt;10 % increase → Improving; &gt;10 % decrease → Worsening;
+    /// otherwise Stable. When no prior snapshot exists, returns null (first fetch).</para>
+    /// </summary>
+    private async Task<TrendDirection?> ComputeMobilityTrendAsync(
+        string snapshotKey,
+        int currentStops,
+        CancellationToken ct)
+    {
+        TrendDirection? trend = null;
+
+        var prior = await _cacheService.GetAsync<TransitSnapshot>(snapshotKey, ct);
+        if (prior is not null && prior.TotalStops > 0)
+        {
+            var ratio = currentStops / (double)prior.TotalStops;
+            trend = ratio switch
+            {
+                > 1.10 => TrendDirection.Improving,
+                < 0.90 => TrendDirection.Worsening,
+                _ => TrendDirection.Stable,
+            };
+
+            _logger.LogInformation(
+                "SpTransGeoSampaTransitProvider: MobilityTrend={Trend} (prior={Prior}, current={Current})",
+                trend,
+                prior.TotalStops,
+                currentStops);
+        }
+
+        // Persist current snapshot for the next fetch cycle
+        await _cacheService.SetAsync(
+            snapshotKey,
+            new TransitSnapshot { TotalStops = currentStops, RecordedAt = DateTime.UtcNow },
+            SnapshotTtl,
+            ct);
+
+        return trend;
+    }
+
+    /// <summary>Persisted snapshot payload stored in Redis for trend comparison.</summary>
+    private sealed class TransitSnapshot
+    {
+        public int TotalStops { get; set; }
+        public DateTime RecordedAt { get; set; }
+    }
 
     private sealed record SpTransStopsResponse
     {

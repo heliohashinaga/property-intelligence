@@ -2,11 +2,14 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 using PropertyIntelligence.Providers.Mock;
+using PropertyIntelligence.Providers.Transit;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
@@ -52,7 +55,7 @@ public sealed class TransitProvidersTests
                 .WithStatusCode(200));
 
         using var http = new HttpClient { BaseAddress = new Uri(server.Urls[0]) };
-        var provider = CreateProvider("PropertyIntelligence.Providers.Transit.SpTransGeoSampaTransitProvider", http);
+        var provider = CreateSpTransProvider(http);
 
         var result = await provider.FetchAsync(RequestedSaoPauloAddress());
 
@@ -63,6 +66,7 @@ public sealed class TransitProvidersTests
         result.Data.Supermarkets1km.Should().Be(0);
         result.Data.Pharmacies1km.Should().Be(0);
         result.Data.Parks1km.Should().Be(0);
+        // No prior snapshot → MobilityTrend is null on first fetch
         result.Data.MobilityTrend.Should().BeNull();
 
         using var rawPayload = JsonDocument.Parse(result.RawPayload);
@@ -131,6 +135,17 @@ public sealed class TransitProvidersTests
             request.Body.Contains("\"highway\"=\"bus_stop\"", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Creates the <see cref="SpTransGeoSampaTransitProvider"/> with a null-returning
+    /// <see cref="ICacheService"/> (no prior snapshot → MobilityTrend will be null).
+    /// </summary>
+    private static IDataProvider<PoiData> CreateSpTransProvider(HttpClient httpClient)
+        => new SpTransGeoSampaTransitProvider(
+            httpClient,
+            TimeSpan.FromDays(7),
+            new NullCacheService(),
+            NullLogger<SpTransGeoSampaTransitProvider>.Instance);
+
     private static IDataProvider<PoiData> CreateProvider(string fullTypeName, HttpClient httpClient)
     {
         var providerType = typeof(MockMobilityProvider).Assembly.GetType(fullTypeName);
@@ -155,4 +170,12 @@ public sealed class TransitProvidersTests
         Lat = -23.55052,
         Lng = -46.633308,
     };
+
+    /// <summary>No-op cache service — always returns null on Get, ignores Set.</summary>
+    private sealed class NullCacheService : ICacheService
+    {
+        public Task<T?> GetAsync<T>(string key, CancellationToken ct = default) => Task.FromResult(default(T));
+        public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RemoveAsync(string key, CancellationToken ct = default) => Task.CompletedTask;
+    }
 }

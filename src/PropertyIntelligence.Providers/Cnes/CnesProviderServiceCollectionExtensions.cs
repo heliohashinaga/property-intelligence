@@ -23,7 +23,8 @@ public static class CnesProviderServiceCollectionExtensions
         {
             var dbContext = sp.GetRequiredService<Core.Data.PropertyIntelligenceDbContext>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CnesHealthProvider>>();
-            return new CnesHealthProvider(dbContext, logger, ttl);
+            var cacheService = sp.GetRequiredService<ICacheService>();
+            return new CnesHealthProvider(dbContext, logger, ttl, cacheService);
         });
 
         return services;

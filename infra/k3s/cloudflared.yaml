@@ -1,0 +1,62 @@
+# ── Cloudflare Tunnel — Deployment ───────────────────────────────────────────
+#
+# Cloudflared routes external HTTPS traffic to the ClusterIP API Service
+# without requiring a public NodePort or LoadBalancer.
+#
+# Token created via:
+#   Zero Trust → Access → Tunnels → Create a tunnel → Copy token
+# Store in the same secret:
+#   kubectl create secret generic property-intelligence-secrets \
+#     ... --from-literal=CLOUDFLARE_TUNNEL_TOKEN='...' -n property-intelligence
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: property-intelligence
+  labels:
+    app: cloudflared
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          args:
+            - tunnel
+            - --no-autoupdate
+            - run
+            - --token
+            - $(CLOUDFLARE_TUNNEL_TOKEN)
+          env:
+            - name: CLOUDFLARE_TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: property-intelligence-secrets
+                  key: CLOUDFLARE_TUNNEL_TOKEN
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 5
+            periodSeconds: 10

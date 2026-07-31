@@ -23,7 +23,8 @@ public static class InepProviderServiceCollectionExtensions
         {
             var dbContext = sp.GetRequiredService<Core.Data.PropertyIntelligenceDbContext>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<InepSchoolProvider>>();
-            return new InepSchoolProvider(dbContext, logger, ttl);
+            var cacheService = sp.GetRequiredService<ICacheService>();
+            return new InepSchoolProvider(dbContext, logger, ttl, cacheService);
         });
 
         return services;

@@ -23,7 +23,8 @@ public static class IbgeProviderServiceCollectionExtensions
         {
             var dbContext = sp.GetRequiredService<Core.Data.PropertyIntelligenceDbContext>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<IbgeCensusProvider>>();
-            return new IbgeCensusProvider(dbContext, logger, ttl);
+            var cacheService = sp.GetRequiredService<ICacheService>();
+            return new IbgeCensusProvider(dbContext, logger, ttl, cacheService);
         });
 
         return services;

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PropertyIntelligence.Api.Observability;
 using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
@@ -24,6 +25,7 @@ public static class AnalyzeEndpoint
         IPropertyAnalysisEngine analysisEngine,
         IExplainabilityService explainabilityService,
         PropertyIntelligenceDbContext dbContext,
+        PropertyIntelligenceMetrics metrics,
         ILoggerFactory loggerFactory,
         CancellationToken ct)
     {
@@ -81,8 +83,11 @@ public static class AnalyzeEndpoint
             apiConsumer?.Id ?? Guid.Empty,
             clientIp);
 
+        var insightSw = System.Diagnostics.Stopwatch.StartNew();
         var insight = await explainabilityService.GenerateInsightAsync(analysis, profile, ct)
             ?? BuildFallbackInsight(profile, analysis);
+        insightSw.Stop();
+        metrics.InsightGenerationMs.Record(insightSw.Elapsed.TotalMilliseconds);
 
         // ── Audit persistence (T037) ──
         // Single transaction: insert analysis (address already persisted above), backfill raw logs
@@ -179,6 +184,11 @@ public static class AnalyzeEndpoint
             analysis.AddressId,
             analysis.CompositeScore,
             analysis.CompositeMax);
+
+        // ── OTel metrics (T071) ──────────────────────────────────────────────
+        var elapsedMs = (DateTime.UtcNow - requestStart).TotalMilliseconds;
+        metrics.AnalysisDurationMs.Record(elapsedMs);
+        metrics.CompositeScore.Record(responseComposite);
 
         return Results.Ok(new
         {
