@@ -7,9 +7,11 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PropertyIntelligence.Core.Data;
 using PropertyIntelligence.Core.Domain;
 using PropertyIntelligence.Core.Interfaces;
 using PropertyIntelligence.Providers.Registry;
@@ -202,6 +204,27 @@ public sealed class AnalyzeEndpointTests : IClassFixture<AnalyzeEndpointTests.An
             {
                 services.RemoveAll<IProviderRegistry>();
                 services.AddSingleton<IStartupFilter>(new TestApiConsumerStartupFilter(ValidApiKey));
+
+                // Replace real Npgsql DbContext with in-memory provider so contract
+                // tests run without a live PostgreSQL connection.
+                // Remove ALL EF Core registrations for this context to avoid dual-provider conflict.
+                var descriptorsToRemove = services
+                    .Where(static d =>
+                        d.ServiceType == typeof(DbContextOptions<PropertyIntelligenceDbContext>) ||
+                        d.ServiceType == typeof(DbContextOptions) ||
+                        d.ServiceType == typeof(PropertyIntelligenceDbContext) ||
+                        d.ServiceType.FullName?.StartsWith(
+                            "Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration",
+                            StringComparison.Ordinal) == true)
+                    .ToList();
+                foreach (var d in descriptorsToRemove)
+                    services.Remove(d);
+
+                services.AddDbContext<PropertyIntelligenceDbContext>(options =>
+                    options
+                        .UseInMemoryDatabase($"contract-test-{Guid.NewGuid()}")
+                        .ConfigureWarnings(w => w.Ignore(
+                            Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
 
                 var registryFixturePath = Path.Combine(
                     AppContext.BaseDirectory,

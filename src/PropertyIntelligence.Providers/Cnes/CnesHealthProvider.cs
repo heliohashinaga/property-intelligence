@@ -17,8 +17,11 @@ namespace PropertyIntelligence.Providers.Cnes;
 /// </summary>
 public sealed class CnesHealthProvider : IDataProvider<HealthData>
 {
+    private static readonly TimeSpan SnapshotTtl = TimeSpan.FromDays(36 * 30);
+
     private readonly PropertyIntelligenceDbContext _dbContext;
     private readonly ILogger<CnesHealthProvider> _logger;
+    private readonly ICacheService _cacheService;
     private readonly TimeSpan _cacheTtl;
 
     public string ProviderName => "cnes";
@@ -28,11 +31,13 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
     public CnesHealthProvider(
         PropertyIntelligenceDbContext dbContext,
         ILogger<CnesHealthProvider> logger,
-        TimeSpan cacheTtl)
+        TimeSpan cacheTtl,
+        ICacheService cacheService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _cacheTtl = cacheTtl;
+        _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
     }
 
     /// <summary>
@@ -109,7 +114,7 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
             HospitalsWithin2km = hospitalsCount,
             ClinicsWith2km = clinicsCount,
             EmergencyUnits2km = emergencyCount,
-            InfrastructureTrend = null, // Populated in US2 (Phase 4)
+            InfrastructureTrend = await ComputeInfrastructureTrendAsync(address, hospitalsCount + clinicsCount + emergencyCount, ct),
         };
 
         // Serialize result as raw payload for audit trail
@@ -125,17 +130,68 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
         });
 
         _logger.LogInformation(
-            "CnesHealthProvider: Fetched health data. Address={NormalizedAddress}, Hospitals={Hospitals}, Clinics={Clinics}, Emergency={Emergency}",
+            "CnesHealthProvider: Fetched health data. Address={NormalizedAddress}, Hospitals={Hospitals}, Clinics={Clinics}, Emergency={Emergency}, Trend={Trend}",
             address.NormalizedAddress,
             hospitalsCount,
             clinicsCount,
-            emergencyCount);
+            emergencyCount,
+            healthData.InfrastructureTrend?.ToString() ?? "unavailable");
 
         return new ProviderFetchResult<HealthData>
         {
             Data = healthData,
             RawPayload = rawPayload,
         };
+    }
+
+    /// <summary>
+    /// Compares current total health-facility count against the prior Redis snapshot to
+    /// derive a 36-month <see cref="TrendDirection"/> for the infrastructure dimension.
+    ///
+    /// <para>Thresholds: &gt;10 % increase → Improving; &gt;10 % decrease → Worsening;
+    /// otherwise Stable. Returns null when no prior snapshot exists (first fetch).</para>
+    /// </summary>
+    private async Task<TrendDirection?> ComputeInfrastructureTrendAsync(
+        PropertyAddress address,
+        int totalFacilities,
+        CancellationToken ct)
+    {
+        var snapshotKey = BuildSnapshotKey(address);
+        TrendDirection? trend = null;
+
+        var prior = await _cacheService.GetAsync<FacilitySnapshot>(snapshotKey, ct);
+        if (prior is not null && prior.TotalFacilities > 0)
+        {
+            var ratio = totalFacilities / (double)prior.TotalFacilities;
+            trend = ratio switch
+            {
+                > 1.10 => TrendDirection.Improving,
+                < 0.90 => TrendDirection.Worsening,
+                _ => TrendDirection.Stable,
+            };
+        }
+
+        await _cacheService.SetAsync(
+            snapshotKey,
+            new FacilitySnapshot { TotalFacilities = totalFacilities, RecordedAt = DateTime.UtcNow },
+            SnapshotTtl,
+            ct);
+
+        return trend;
+    }
+
+    private static string BuildSnapshotKey(PropertyAddress address)
+    {
+        var normalized = address.NormalizedAddress?.ToLowerInvariant() ?? string.Empty;
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized));
+        var hash = Convert.ToHexString(bytes)[..16].ToLowerInvariant();
+        return $"cnes:trend_snapshot:{hash}";
+    }
+
+    private sealed class FacilitySnapshot
+    {
+        public int TotalFacilities { get; set; }
+        public DateTime RecordedAt { get; set; }
     }
 
     /// <summary>

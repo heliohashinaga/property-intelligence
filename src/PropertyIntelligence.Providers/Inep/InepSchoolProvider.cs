@@ -17,8 +17,11 @@ namespace PropertyIntelligence.Providers.Inep;
 /// </summary>
 public sealed class InepSchoolProvider : IDataProvider<SchoolData>
 {
+    private static readonly TimeSpan SnapshotTtl = TimeSpan.FromDays(36 * 30);
+
     private readonly PropertyIntelligenceDbContext _dbContext;
     private readonly ILogger<InepSchoolProvider> _logger;
+    private readonly ICacheService _cacheService;
     private readonly TimeSpan _cacheTtl;
 
     public string ProviderName => "inep";
@@ -28,11 +31,13 @@ public sealed class InepSchoolProvider : IDataProvider<SchoolData>
     public InepSchoolProvider(
         PropertyIntelligenceDbContext dbContext,
         ILogger<InepSchoolProvider> logger,
-        TimeSpan cacheTtl)
+        TimeSpan cacheTtl,
+        ICacheService cacheService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _cacheTtl = cacheTtl;
+        _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
     }
 
     /// <summary>
@@ -104,7 +109,7 @@ public sealed class InepSchoolProvider : IDataProvider<SchoolData>
         {
             SchoolsWithin2km = countResult?.Count ?? 0,
             NearestSchoolIdeb = nearestResult?.IdebScore,
-            InfrastructureTrend = null, // Populated in US2 (Phase 4)
+            InfrastructureTrend = await ComputeInfrastructureTrendAsync(address, countResult?.Count ?? 0, ct),
         };
 
         // Serialize result as raw payload for audit trail
@@ -119,16 +124,67 @@ public sealed class InepSchoolProvider : IDataProvider<SchoolData>
         });
 
         _logger.LogInformation(
-            "InepSchoolProvider: Fetched school data. Address={NormalizedAddress}, SchoolsCount={Count}, NearestIDEB={IDEB}",
+            "InepSchoolProvider: Fetched school data. Address={NormalizedAddress}, SchoolsCount={Count}, NearestIDEB={IDEB}, Trend={Trend}",
             address.NormalizedAddress,
             schoolData.SchoolsWithin2km,
-            schoolData.NearestSchoolIdeb?.ToString("F1") ?? "none");
+            schoolData.NearestSchoolIdeb?.ToString("F1") ?? "none",
+            schoolData.InfrastructureTrend?.ToString() ?? "unavailable");
 
         return new ProviderFetchResult<SchoolData>
         {
             Data = schoolData,
             RawPayload = rawPayload,
         };
+    }
+
+    /// <summary>
+    /// Compares current school count against the prior Redis snapshot to
+    /// derive a 36-month <see cref="TrendDirection"/> for the infrastructure dimension.
+    ///
+    /// <para>Thresholds: &gt;10 % increase → Improving; &gt;10 % decrease → Worsening;
+    /// otherwise Stable. Returns null when no prior snapshot exists (first fetch).</para>
+    /// </summary>
+    private async Task<TrendDirection?> ComputeInfrastructureTrendAsync(
+        PropertyAddress address,
+        int schoolCount,
+        CancellationToken ct)
+    {
+        var snapshotKey = BuildSnapshotKey(address);
+        TrendDirection? trend = null;
+
+        var prior = await _cacheService.GetAsync<SchoolSnapshot>(snapshotKey, ct);
+        if (prior is not null && prior.SchoolCount > 0)
+        {
+            var ratio = schoolCount / (double)prior.SchoolCount;
+            trend = ratio switch
+            {
+                > 1.10 => TrendDirection.Improving,
+                < 0.90 => TrendDirection.Worsening,
+                _ => TrendDirection.Stable,
+            };
+        }
+
+        await _cacheService.SetAsync(
+            snapshotKey,
+            new SchoolSnapshot { SchoolCount = schoolCount, RecordedAt = DateTime.UtcNow },
+            SnapshotTtl,
+            ct);
+
+        return trend;
+    }
+
+    private static string BuildSnapshotKey(PropertyAddress address)
+    {
+        var normalized = address.NormalizedAddress?.ToLowerInvariant() ?? string.Empty;
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized));
+        var hash = Convert.ToHexString(bytes)[..16].ToLowerInvariant();
+        return $"inep:trend_snapshot:{hash}";
+    }
+
+    private sealed class SchoolSnapshot
+    {
+        public int SchoolCount { get; set; }
+        public DateTime RecordedAt { get; set; }
     }
 
     /// <summary>

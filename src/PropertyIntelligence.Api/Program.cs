@@ -90,6 +90,9 @@ builder.Services.AddHttpClient<IExplainabilityService, LlmExplainabilityService>
 // which entries are enabled at runtime.
 builder.Services.AddMockProviders();
 
+// ── Custom OpenTelemetry metrics (T071) ──────────────────────────────────────
+builder.Services.AddSingleton<PropertyIntelligence.Api.Observability.PropertyIntelligenceMetrics>();
+
 // ── OpenTelemetry — OTLP exporter (T039 will wire remaining instrumentations) ─
 var otlpEndpoint = builder.Configuration["GRAFANA_OTLP_ENDPOINT"]
     ?? Environment.GetEnvironmentVariable("GRAFANA_OTLP_ENDPOINT");
@@ -116,6 +119,7 @@ if (!string.IsNullOrEmpty(otlpEndpoint))
         .WithMetrics(m =>
         {
             m.AddAspNetCoreInstrumentation();
+            m.AddMeter(PropertyIntelligence.Api.Observability.PropertyIntelligenceMetrics.MeterName);
             m.AddOtlpExporter(o =>
             {
                 o.Endpoint = new Uri(otlpEndpoint);

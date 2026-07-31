@@ -1,0 +1,113 @@
+# ── PostgreSQL + PostGIS — StatefulSet ───────────────────────────────────────
+#
+# Uses the official postgis image (postgis/postgis:16-3.4).
+# Migrations are applied by an init container on first start-up.
+#
+# PVC claim: 20 Gi on the default StorageClass (Hetzner block volume via the
+# k3s local-path provisioner is fine for single-node; swap for a proper SC
+# in HA setups).
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: property-intelligence
+data:
+  # Path is mounted at /docker-entrypoint-initdb.d/ — Postgres runs it automatically
+  # on a fresh cluster initialisation (empty data dir). This does NOT run on restarts.
+  #
+  # For subsequent schema changes use the migration runner:
+  #   sh infra/migrations/run.sh
+  001_initial_schema.sql: |
+    -- Delegated to infra/migrations/001_initial_schema.sql — keep in sync.
+    -- This placeholder ensures PostGIS extension is available before the migration runner executes.
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: property-intelligence
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgis/postgis:16-3.4
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: property_intelligence
+            - name: POSTGRES_USER
+              value: property_intelligence
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: property-intelligence-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "property_intelligence"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "property_intelligence"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: property-intelligence
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+  clusterIP: None  # Headless — required for StatefulSet DNS
