@@ -104,7 +104,7 @@ it via `/skill:multi-agent-orchestration` when planning or delegating.
   worktree cleanup and is recoverable via cherry-pick/merge.
 - **Validation commands for this repo:** `dotnet build` (zero errors required),
   `dotnet test tests/PropertyIntelligence.Tests.Unit` and
-  `...Tests.Contract` (fast, no I/O); `...Tests.Integration` needs Docker.
+  `...Tests.Contract` (fast, no I/O).
   These are the `verify` commands for any `acceptance` contract here.
 - **Source of truth for progress:** `specs/001-property-intelligence-api/tasks.md`
   — mark tasks `[x]` only after build + relevant tests pass AND the work is
@@ -176,7 +176,6 @@ property-intelligence/
 │   └── PropertyIntelligence.AppHost/          # .NET Aspire local dev orchestrator
 ├── tests/
 │   ├── PropertyIntelligence.Tests.Contract/     # Provider contract tests (WireMock.Net)
-│   ├── PropertyIntelligence.Tests.Integration/  # End-to-end API tests (Testcontainers)
 │   └── PropertyIntelligence.Tests.Unit/         # Domain logic unit tests
 ├── frontend/                   # Vue.js 3 + Chart.js + Leaflet
 ├── infra/
@@ -316,7 +315,6 @@ dotnet test
 # Run by layer
 dotnet test tests/PropertyIntelligence.Tests.Unit        # fast, no I/O
 dotnet test tests/PropertyIntelligence.Tests.Contract    # WireMock.Net stubs
-dotnet test tests/PropertyIntelligence.Tests.Integration # Testcontainers — needs Docker
 
 # Apply database migrations
 sh infra/migrations/run.sh
