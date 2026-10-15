@@ -145,10 +145,10 @@ public sealed class GeoSampaZoneamentoProvider : IDataProvider<IptuData>
                 lat,
                 lng);
 
-            var emptyPayload = response != null 
-                ? JsonSerializer.Serialize(response) 
+            var emptyPayload = response != null
+                ? JsonSerializer.Serialize(response)
                 : JsonSerializer.Serialize(new { zones = Array.Empty<object>() });
-            
+
             return new ProviderFetchResult<IptuData>
             {
                 Data = new IptuData
