@@ -42,63 +42,10 @@ jobs:
       - name: Contract tests
         run: dotnet test tests/PropertyIntelligence.Tests.Contract --no-build --configuration Release --verbosity normal
 
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: property_intelligence
-          POSTGRES_PASSWORD: property_intelligence
-          POSTGRES_DB: property_intelligence
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Verify whitespace formatting
-        # Full analyzer/style enforcement still has backlog warnings; the CI gate
-        # is intentionally whitespace-only until those warnings are addressed.
-        run: dotnet format whitespace --verify-no-changes --no-restore
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
-
-      - name: Integration tests
-        run: dotnet test tests/PropertyIntelligence.Tests.Integration --no-build --configuration Release --verbosity normal
-
   deploy:
     name: Deploy to K3s
     runs-on: ubuntu-latest
-    needs: [integration-tests]
+    needs: [build-and-test]
     if: github.ref == 'refs/heads/main'
     environment: production
     permissions:
