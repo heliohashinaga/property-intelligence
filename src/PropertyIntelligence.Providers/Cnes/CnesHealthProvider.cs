@@ -99,7 +99,7 @@ public sealed class CnesHealthProvider : IDataProvider<HealthData>
             .Sum(r => r.Count);
 
         var clinicsCount = results
-            .Where(r => r.FacilityType?.ToUpperInvariant().Contains("UBS") == true 
+            .Where(r => r.FacilityType?.ToUpperInvariant().Contains("UBS") == true
                      || r.FacilityType?.ToUpperInvariant().Contains("CLINIC") == true)
             .Sum(r => r.Count);
 
