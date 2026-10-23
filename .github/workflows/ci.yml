@@ -11,6 +11,9 @@ env:
   DATABASE_URL: postgres://property_intelligence:property_intelligence@localhost:5432/property_intelligence
   REDIS_URL: redis://localhost:6379
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build & Unit + Contract Tests
