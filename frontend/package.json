@@ -10,16 +10,16 @@
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",
-    "chart.js": "^4.5.1",
+    "chart.js": "^4.6.1",
     "leaflet": "^1.9.4",
     "vue": "^3.5.44"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/tsconfig": "^0.9.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.5",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.14"
   }
 }
